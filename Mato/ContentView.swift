@@ -2,58 +2,154 @@
 //  ContentView.swift
 //  Mato
 //
-//  Created by Jackson Powell on 5/22/25.
+//  Created by  on 5/22/25.
 //
 
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    @State private var searchText: String = ""
+    @StateObject private var directoryViewModel = DirectoryViewModel()
+    @StateObject private var pinnedFolderStore = PinnedFolderStore.shared
+    @State private var showingAddPinnedFolderSheet = false
+    
     var body: some View {
         NavigationSplitView {
             List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
+                Section("Quick Access") {
+                    Button("Downloads") {
+                        directoryViewModel.loadDownloadsDirectory()
+                    }
+                    .buttonStyle(.plain)
+                    
+                    Button("Home") {
+                        let homeURL = FileManager.default.homeDirectoryForCurrentUser
+                        directoryViewModel.loadDirectory(at: homeURL)
+                        directoryViewModel.currentDirectory = homeURL
+                        directoryViewModel.navigationStack = [homeURL]
+                    }
+                    .buttonStyle(.plain)
+                }
+                
+                Section {
+                    ForEach(pinnedFolderStore.pinnedFolders) { folder in
+                        Button(folder.name) {
+                            directoryViewModel.loadDirectory(at: folder.url)
+                            directoryViewModel.currentDirectory = folder.url
+                            directoryViewModel.navigationStack = [folder.url]
+                        }
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            Button("Remove", role: .destructive) {
+                                pinnedFolderStore.removePinnedFolder(with: folder.id)
+                            }
+                        }
+                    }
+                    
+                    Button("+ Add Folder") {
+                        showingAddPinnedFolderSheet = true
+                    }
+                } header: {
+                    HStack {
+                        Text("Pinned Folders")
+                        Spacer()
                     }
                 }
-                .onDelete(perform: deleteItems)
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .toolbar {
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
-                }
+            .navigationTitle("Mato")
+            .sheet(isPresented: $showingAddPinnedFolderSheet) {
+                AddPinnedFolderView()
             }
         } detail: {
-            Text("Select an item")
+            DirectoryView(viewModel: directoryViewModel)
+                .toolbar {
+                    ToolbarItem(placement: .principal) {
+                        TextField("Search", text: $searchText)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(minWidth: 300)
+                    }
+                    
+                    ToolbarItem(placement: .primaryAction) {
+                        Button("Pin Current Folder") {
+                            if let currentURL = directoryViewModel.currentDirectory {
+                                pinnedFolderStore.addPinnedFolder(currentURL)
+                            }
+                        }
+                        .disabled(directoryViewModel.currentDirectory == nil)
+                    }
+                }
         }
     }
+}
 
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+struct AddPinnedFolderView: View {
+    @State private var folderURL: URL?
+    @State private var folderName: String = ""
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var pinnedFolderStore = PinnedFolderStore.shared
+    
+    var body: some View {
+        VStack {
+            Text("Add Pinned Folder")
+                .font(.title2)
+                .padding()
+            
+            VStack(alignment: .leading) {
+                HStack {
+                    Text("Folder:")
+                    Spacer()
+                    Button("Choose Folder") {
+                        let panel = NSOpenPanel()
+                        panel.canChooseFiles = false
+                        panel.canChooseDirectories = true
+                        panel.allowsMultipleSelection = false
+                        
+                        if panel.runModal() == .OK {
+                            folderURL = panel.url
+                            if folderName.isEmpty {
+                                folderName = folderURL?.lastPathComponent ?? ""
+                            }
+                        }
+                    }
+                }
+                
+                if let url = folderURL {
+                    Text(url.path)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                
+                TextField("Custom Name (Optional)", text: $folderName)
+                    .textFieldStyle(.roundedBorder)
+                    .padding(.vertical)
             }
+            .padding()
+            
+            HStack {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .keyboardShortcut(.escape)
+                
+                Spacer()
+                
+                Button("Add") {
+                    if let url = folderURL {
+                        pinnedFolderStore.addPinnedFolder(url, name: folderName.isEmpty ? nil : folderName)
+                        dismiss()
+                    }
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(folderURL == nil)
+            }
+            .padding()
         }
+        .frame(width: 400, height: 250)
     }
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }

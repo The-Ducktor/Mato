@@ -1,51 +1,272 @@
+//
+//  PathBar.swift
+//  Mato
+//
+//  Created by  on 5/22/25.
+//
+
+import SwiftUI
+
 struct PathBar: View {
     @State private var isEditing = false
     @State private var pathString: String
-    let path: URL
+    @ObservedObject var viewModel: DirectoryViewModel
+    @State var path: URL
+    @FocusState private var isTextFieldFocused: Bool
     
-    init(path: URL) {
+    init(path: URL, viewModel: DirectoryViewModel) {
         self.path = path
         self._pathString = State(initialValue: path.path)
+        self.viewModel = viewModel
     }
     
     var body: some View {
-        ZStack(alignment: .leading) {
+        Group {
             if isEditing {
-                TextField("", text: $pathString, onCommit: {
-                    isEditing = false
-                    // Optionally update `path` based on pathString
-                })
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .onSubmit {
-                    isEditing = false
-                }
-                .onDisappear {
-                    isEditing = false
-                }
+                editingView
             } else {
-                HStack(spacing: 4) {
-                    ForEach(pathComponents(path: URL(fileURLWithPath: pathString)), id: \.self) { component in
-                        Text(component)
-                            .font(.system(size: 14, weight: .medium))
-                        if component != pathComponents(path: URL(fileURLWithPath: pathString)).last {
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                breadcrumbView
+            }
+        }.padding(.horizontal, 30)
+        .frame(maxWidth: .infinity)
+        .frame(height: 34)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(NSColor.controlBackgroundColor))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
+        )
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isEditing)
+        .onChange(of: viewModel.currentDirectory) { newValue in
+            if let directory = viewModel.currentDirectory {
+                path = directory
+                pathString = directory.path
+            }
+        }
+        .onChange(of: isTextFieldFocused) { focused in
+            if !focused && isEditing {
+                // Auto-commit when focus is lost
+                commitEdit()
+            }
+        }
+    }
+    
+    private var editingView: some View {
+        HStack {
+            TextField("Type path and press Enter...", text: $pathString)
+                .textFieldStyle(PlainTextFieldStyle())
+                .font(.system(size: 13, weight: .medium, design: .monospaced))
+                .foregroundColor(.primary)
+                .focused($isTextFieldFocused)
+                .onSubmit {
+                    commitEdit()
+                }
+                .onAppear {
+                    // Ensure focus happens after view is rendered
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        isTextFieldFocused = true
+                        // Select all text for easy replacement
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.01) {
+                            if let textField = NSApp.keyWindow?.firstResponder as? NSTextField {
+                                textField.selectText(nil)
+                            }
                         }
                     }
                 }
-                .padding(6)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(8)
-                .onTapGesture {
-                    isEditing = true
+                .onExitCommand {
+                    cancelEdit()
                 }
+            
+            // Cancel button
+            Button(action: cancelEdit) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 14))
+                    .foregroundColor(.secondary)
             }
+            .buttonStyle(PlainButtonStyle())
+            .opacity(0.7)
         }
-        .animation(.easeInOut, value: isEditing)
+        .padding(.horizontal, 12)
+    }
+    
+    private var breadcrumbView: some View {
+        ZStack {
+            // Background area for click detection - activates editing mode
+            Rectangle()
+                .fill(Color.clear)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    startEditing()
+                }
+            
+            HStack(spacing: 2) {
+                let components = pathComponents(path: URL(fileURLWithPath: pathString))
+                let originalComponents = originalPathComponents(path: URL(fileURLWithPath: pathString))
+                
+                // Folder icon at the start
+                Image(systemName: "folder.fill")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.blue.opacity(0.8))
+                    .padding(.leading, 12)
+                
+                ForEach(Array(components.enumerated()), id: \.offset) { index, component in
+                    HStack(spacing: 0) {
+                        // Path separator
+                        Text("/")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.secondary.opacity(0.6))
+                            .padding(.horizontal, 3)
+                        
+                        // Clickable path component with fancy styling
+                        Text(component)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(index == components.count - 1 ? .primary : .blue)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .fill(index == components.count - 1 ?
+                                          Color.blue.opacity(0.1) :
+                                          Color.clear)
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 4)
+                                    .stroke(index == components.count - 1 ?
+                                            Color.blue.opacity(0.3) :
+                                            Color.clear, lineWidth: 1)
+                            )
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                navigateToComponent(at: index, components: originalComponents)
+                            }
+                            .onHover { isHovering in
+                                // Could add visual hover effects here
+                            }
+                            .allowsHitTesting(true) // Ensure path components are clickable
+                    }
+                }
+                
+                Spacer()
+                
+                // Edit button
+                Button(action: startEditing) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .padding(.trailing, 12)
+                .opacity(0.6)
+                .allowsHitTesting(true) // Ensure button is clickable
+            }
+            .allowsHitTesting(true) // Make sure the HStack and its contents can receive events
+        }
     }
     
     private func pathComponents(path: URL) -> [String] {
+        let components = path.pathComponents.filter { $0 != "/" }
+        
+        // Show home symbol for user directory
+        let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
+        if path.path.hasPrefix(homeDir) {
+            var modifiedComponents = components
+            if let userIndex = modifiedComponents.firstIndex(where: { component in
+                homeDir.contains(component) && component != "Users"
+            }) {
+                modifiedComponents[userIndex] = "~"
+                // Remove "Users" if it exists before the home directory
+                if userIndex > 0 && modifiedComponents[userIndex - 1] == "Users" {
+                    modifiedComponents.remove(at: userIndex - 1)
+                }
+            }
+            return modifiedComponents
+        }
+        
+        return components.isEmpty ? ["Root"] : components
+    }
+    
+    private func originalPathComponents(path: URL) -> [String] {
         return path.pathComponents.filter { $0 != "/" }
+    }
+    
+    private func navigateToComponent(at index: Int, components: [String]) {
+        // Special case for root level
+        if index == -1 || components.isEmpty {
+            viewModel.navigateToPath("/")
+            return
+        }
+        
+        // Get the current display components (what user sees)
+        let displayComponents = pathComponents(path: URL(fileURLWithPath: pathString))
+        
+        // Special case for home directory (~)
+        if index < displayComponents.count && displayComponents[index] == "~" {
+            let homePath = FileManager.default.homeDirectoryForCurrentUser.path
+            viewModel.navigateToPath(homePath)
+            return
+        }
+        
+        // Get the clicked component name
+        _ = displayComponents[index]
+        
+        // For typical file paths, rebuild the path based on original components
+        let fullPath = URL(fileURLWithPath: pathString)
+        
+        // When user clicks breadcrumbs from right to left, we need to go up in the path
+        // Calculate how many levels to go up: total components minus clicked index minus 1
+        let levelsUp = displayComponents.count - index - 1
+        
+        // Apply the changes
+        var targetPath = fullPath
+        for _ in 0..<levelsUp {
+            targetPath = targetPath.deletingLastPathComponent()
+        }
+        
+        // Navigate to the constructed path
+        viewModel.navigateToPath(targetPath.path)
+    }
+    
+    private func startEditing() {
+        withAnimation(.snappy(duration: 0.2)) {
+            isEditing = true
+        }
+    }
+    
+    private func commitEdit() {
+        let trimmedPath = pathString.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Expand tilde to home directory
+        let expandedPath = NSString(string: trimmedPath).expandingTildeInPath
+        
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isEditing = false
+        }
+        
+        // Validate path exists before navigating
+        if FileManager.default.fileExists(atPath: expandedPath) {
+            // Only navigate if the path has actually changed
+            if expandedPath != path.path {
+                viewModel.navigateToPath(expandedPath)
+            }
+        } else {
+            // Revert to current path if invalid
+            pathString = path.path
+            // Could add error feedback here
+        }
+        
+        isTextFieldFocused = false
+    }
+    
+    private func cancelEdit() {
+        pathString = path.path
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isEditing = false
+        }
+        isTextFieldFocused = false
     }
 }
