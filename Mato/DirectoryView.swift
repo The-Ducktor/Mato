@@ -108,6 +108,8 @@ struct DirectoryView: View {
                                 NSWorkspace.shared.activateFileViewerSelecting([item.url])
                             }
                         }}
+                    
+                    
                 } primaryAction: { ids in
                     for id in ids {
                         if let item = viewModel.items.first(where: { $0.id == id }) {

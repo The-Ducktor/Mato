@@ -27,7 +27,7 @@ struct PathBar: View {
             } else {
                 breadcrumbView
             }
-        }.padding(.horizontal, 30)
+        }.padding(.horizontal, 10) // Reduced horizontal padding to accommodate navigation buttons
         .frame(maxWidth: .infinity)
         .frame(height: 34)
         .background(
@@ -103,6 +103,41 @@ struct PathBar: View {
                 }
             
             HStack(spacing: 2) {
+                // Navigation buttons
+                HStack(spacing: 8) {
+                    // Back button
+                    Button(action: {
+                        viewModel.navigateBack()
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(viewModel.canNavigateBack() ? .blue : .gray.opacity(0.5))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(!viewModel.canNavigateBack())
+                    .help("Go back")
+                    
+                    // Forward button
+                    Button(action: {
+                        viewModel.navigateForward()
+                    }) {
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(viewModel.canNavigateForward() ? .blue : .gray.opacity(0.5))
+                            .frame(width: 24, height: 24)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .disabled(!viewModel.canNavigateForward())
+                    .help("Go forward")
+                    
+                    Divider()
+                        .frame(height: 16)
+                }
+                .padding(.leading, 8)
+                
                 let components = pathComponents(path: URL(fileURLWithPath: pathString))
                 let originalComponents = originalPathComponents(path: URL(fileURLWithPath: pathString))
                 
@@ -110,7 +145,7 @@ struct PathBar: View {
                 Image(systemName: "folder.fill")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.blue.opacity(0.8))
-                    .padding(.leading, 12)
+                    .padding(.leading, 4) // Reduced leading padding as we have navigation buttons now
                 
                 ForEach(Array(components.enumerated()), id: \.offset) { index, component in
                     HStack(spacing: 0) {

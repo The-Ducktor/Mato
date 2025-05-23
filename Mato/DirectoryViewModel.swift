@@ -20,6 +20,7 @@ class DirectoryViewModel: ObservableObject {
     @Published var items: [DirectoryItem] = []
     @Published var currentDirectory: URL?
     @Published var navigationStack: [URL] = []
+    @Published var forwardStack: [URL] = []
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var sortOption: SortOption = .dateAdded
@@ -41,6 +42,7 @@ class DirectoryViewModel: ObservableObject {
         
         currentDirectory = downloadsURL
         navigationStack = [downloadsURL]
+        forwardStack = []
         loadDirectory(at: downloadsURL)
     }
     
@@ -78,6 +80,9 @@ class DirectoryViewModel: ObservableObject {
     
     func openItem(_ item: DirectoryItem) {
         if item.isDirectory {
+            // When navigating to a new directory, clear the forward stack
+            forwardStack.removeAll()
+            
             // Navigate into the directory
             currentDirectory = item.url
             navigationStack.append(item.url)
@@ -91,7 +96,13 @@ class DirectoryViewModel: ObservableObject {
     func navigateBack() {
         guard navigationStack.count > 1 else { return }
         
-        // Remove current directory
+        // Get current directory before removing it from navigation stack
+        if let current = currentDirectory {
+            // Add current directory to forward stack for future forward navigation
+            forwardStack.append(current)
+        }
+        
+        // Remove current directory from navigation stack
         navigationStack.removeLast()
         
         // Go to previous directory
@@ -99,6 +110,26 @@ class DirectoryViewModel: ObservableObject {
             currentDirectory = previousDirectory
             loadDirectory(at: previousDirectory)
         }
+    }
+    
+    func navigateForward() {
+        guard !forwardStack.isEmpty else { return }
+        
+        // Get the next directory from the forward stack
+        let nextDirectory = forwardStack.removeLast()
+        
+        // Add it to the navigation stack
+        navigationStack.append(nextDirectory)
+        currentDirectory = nextDirectory
+        loadDirectory(at: nextDirectory)
+    }
+    
+    func canNavigateBack() -> Bool {
+        return navigationStack.count > 1
+    }
+    
+    func canNavigateForward() -> Bool {
+        return !forwardStack.isEmpty
     }
     
     func navigateToPath(_ path: String) {
@@ -114,6 +145,7 @@ class DirectoryViewModel: ObservableObject {
             // Reset navigation stack to just this path
             // (since we don't know the hierarchy when manually entering a path)
             navigationStack = [url]
+            forwardStack = []
             loadDirectory(at: url)
         } else {
             // Invalid path

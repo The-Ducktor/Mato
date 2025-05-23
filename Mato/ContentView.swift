@@ -46,9 +46,13 @@ struct ContentView: View {
                         }
                     }
                     
-                    Button("+ Add Folder") {
-                        showingAddPinnedFolderSheet = true
+                    Button("Pin Current Folder") {
+                        if let currentURL = directoryViewModel.currentDirectory {
+                            pinnedFolderStore.addPinnedFolder(currentURL)
+                        }
                     }
+                    .disabled(directoryViewModel.currentDirectory == nil)
+                    .buttonStyle(.bordered)
                 } header: {
                     HStack {
                         Text("Pinned Folders")
@@ -69,15 +73,8 @@ struct ContentView: View {
                             .frame(minWidth: 300)
                     }
                     
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Pin Current Folder") {
-                            if let currentURL = directoryViewModel.currentDirectory {
-                                pinnedFolderStore.addPinnedFolder(currentURL)
-                            }
-                        }
-                        .disabled(directoryViewModel.currentDirectory == nil)
-                    }
-                }
+                    
+                } .navigationTitle(directoryViewModel.currentDirectory?.lastPathComponent ?? "Mato")
         }
     }
 }
