@@ -14,16 +14,10 @@ struct PathBar: View {
     @State var path: URL
     @FocusState private var isTextFieldFocused: Bool
     
-    // Add sorting state
-    @Binding var sortColumn: DirectoryView.SortColumn
-    @Binding var sortAscending: Bool
-    
-    init(path: URL, viewModel: DirectoryViewModel, sortColumn: Binding<DirectoryView.SortColumn>, sortAscending: Binding<Bool>) {
+    init(path: URL, viewModel: DirectoryViewModel) {
         self.path = path
         self._pathString = State(initialValue: path.path)
         self.viewModel = viewModel
-        self._sortColumn = sortColumn
-        self._sortAscending = sortAscending
     }
     
     var body: some View {
@@ -194,60 +188,11 @@ struct PathBar: View {
                 
                 Spacer()
                 
-                // Sort Menu - Fixed styling
-                Menu {
-                    Button(action: { setSortColumn(.name) }) {
-                        HStack {
-                            Text("Name")
-                            if sortColumn == .name {
-                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                            }
-                        }
-                    }
-                    
-                    Button(action: { setSortColumn(.size) }) {
-                        HStack {
-                            Text("Size")
-                            if sortColumn == .size {
-                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                            }
-                        }
-                    }
-                    
-                    Button(action: { setSortColumn(.fileType) }) {
-                        HStack {
-                            Text("File Type")
-                            if sortColumn == .fileType {
-                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                            }
-                        }
-                    }
-                    
-                    Button(action: { setSortColumn(.dateModified) }) {
-                        HStack {
-                            Text("Date Modified")
-                            if sortColumn == .dateModified {
-                                Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundColor(.secondary)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
-                }
-                .menuStyle(.borderlessButton)
-                .help("Sort by").frame(width: 48)
-                
                 // Edit button
                 Button(action: startEditing) {
                     Image(systemName: "pencil")
                         .font(.system(size: 11, weight: .medium))
                         .foregroundColor(.secondary)
-                        .frame(width: 24, height: 24)
-                        .contentShape(Rectangle())
                 }
                 .buttonStyle(PlainButtonStyle())
                 .padding(.trailing, 12)
@@ -319,16 +264,6 @@ struct PathBar: View {
         
         // Navigate to the constructed path
         viewModel.navigateToPath(targetPath.path)
-    }
-    
-    // Function to set the sort column
-    private func setSortColumn(_ column: DirectoryView.SortColumn) {
-        if sortColumn == column {
-            sortAscending.toggle()
-        } else {
-            sortColumn = column
-            sortAscending = true
-        }
     }
     
     private func startEditing() {

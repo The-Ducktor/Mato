@@ -41,10 +41,10 @@ class FileManagerService {
                 
                 let isDirectory = resourceValues.isDirectory ?? false
                 let fileName = url.lastPathComponent
-                let fileSize = resourceValues.fileSize
-                let fileType = resourceValues.contentType
-                let modificationDate = resourceValues.contentModificationDate
-                let creationDate = resourceValues.creationDate
+                let fileSize = resourceValues.fileSize ?? 0
+                let fileType = resourceValues.contentType ?? UTType.data
+                let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
+                let creationDate = resourceValues.creationDate ?? Date.distantPast
                 let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
                 
                 
