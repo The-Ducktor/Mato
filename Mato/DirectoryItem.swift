@@ -18,4 +18,8 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable {
     let lastModified: Date?
     let creationDate: Date?
     let isHidden: Bool?
+    
+    var fileTypeDescription: String {
+            return fileType?.localizedDescription ?? ""
+        }
 }

@@ -258,12 +258,8 @@ struct FileManagerPane: View {
                 onActivate()
             }
             
-            // Directory content
-            DirectoryView(viewModel: viewModel)
-                .contentShape(Rectangle()) // Make the entire content area tappable
-                .onTapGesture {
-                    onActivate()
-                }
+            // Directory content - pass onActivate to DirectoryView
+            DirectoryView(viewModel: viewModel, onActivate: onActivate)
         }
         .background(.background)
         .clipShape(RoundedRectangle(cornerRadius: 6))

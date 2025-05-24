@@ -29,6 +29,9 @@ class DirectoryViewModel: ObservableObject {
     @Published var sortAscending: Bool = false
     @Published var pathString: String = ""
     @Published var hideHiddenFiles: Bool = true
+    @Published var sortOrder: [KeyPathComparator<DirectoryItem>] = [
+        KeyPathComparator(\DirectoryItem.name, order: .forward)
+    ]
     
     private let fileManager = FileManagerService.shared
     
@@ -57,22 +60,19 @@ class DirectoryViewModel: ObservableObject {
         
         // Capture the current state we need in the background task
         let shouldHideHiddenFiles = hideHiddenFiles
-        let currentSortOption = sortOption
-        let currentSortAscending = sortAscending
+        let currentSortOrder = sortOrder
         
         Task { [weak self, fileManager] in
             do {
                 // Get contents on background thread using captured fileManager
-                let contents = try await fileManager.getContents(of: url)
+                let contents = try fileManager.getContents(of: url)
                 
                 // Filter hidden files if needed
                 let filteredContents = shouldHideHiddenFiles ?
                     contents.filter { !($0.isHidden ?? false) } : contents
                 
-                // Sort the contents based on captured sort options
-                let sortedContents = Self.sortItemsStatic(filteredContents,
-                                                         sortOption: currentSortOption,
-                                                         sortAscending: currentSortAscending)
+                // Sort using KeyPathComparator
+                let sortedContents = filteredContents.sorted(using: currentSortOrder)
                 
                 // Update UI on main actor
                 guard let self = self else { return }
@@ -234,6 +234,62 @@ class DirectoryViewModel: ObservableObject {
             sortOption = option
             // Default to ascending for name and type, descending for dates and size
             sortAscending = (option == .name || option == .type)
+        }
+        
+        // Update sortOrder based on sortOption and sortAscending
+        updateSortOrder()
+        
+        // Re-sort current items
+        if let currentDir = currentDirectory {
+            loadDirectory(at: currentDir)
+        }
+    }
+    
+    // New method to update sortOrder based on sortOption and sortAscending
+    func updateSortOrder() {
+        let order: SortOrder = sortAscending ? .forward : .reverse
+        
+        switch sortOption {
+        case .name:
+            sortOrder = [KeyPathComparator(\DirectoryItem.name, order: order)]
+        case .dateAdded:
+            sortOrder = [KeyPathComparator(\DirectoryItem.creationDate, order: order)]
+        case .dateModified:
+            sortOrder = [KeyPathComparator(\DirectoryItem.lastModified, order: order)]
+        case .size:
+            sortOrder = [KeyPathComparator(\DirectoryItem.size, order: order)]
+        case .type:
+            // For type, we first sort by isDirectory, then by fileType
+            sortOrder = sortOrder
+            
+        }
+    }
+    
+    // Method to handle changes to sortOrder from the Table view
+    func applySortOrder(_ newSortOrder: [KeyPathComparator<DirectoryItem>]) {
+        sortOrder = newSortOrder
+        
+        // Try to determine the new sortOption and sortAscending based on the first comparator
+        if let firstComparator = newSortOrder.first {
+            let isAscending = firstComparator.order == .forward
+            
+            // Determine which keyPath is being used
+            if firstComparator.keyPath == \DirectoryItem.name {
+                sortOption = .name
+                sortAscending = isAscending
+            } else if firstComparator.keyPath == \DirectoryItem.creationDate {
+                sortOption = .dateAdded
+                sortAscending = isAscending
+            } else if firstComparator.keyPath == \DirectoryItem.lastModified {
+                sortOption = .dateModified
+                sortAscending = isAscending
+            } else if firstComparator.keyPath == \DirectoryItem.size {
+                sortOption = .size
+                sortAscending = isAscending
+            } else if firstComparator.keyPath == \DirectoryItem.fileType {
+                sortOption = .type
+                sortAscending = isAscending
+            }
         }
         
         // Re-sort current items
