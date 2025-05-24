@@ -4,10 +4,11 @@
 //
 //  Created by on 5/22/25.
 //
+
 import Foundation
 import UniformTypeIdentifiers
 
-public struct DirectoryItem: Identifiable, Hashable {
+public struct DirectoryItem: Identifiable, Hashable, Sendable {
     public let id = UUID()
     let isDirectory: Bool
     let url: URL
@@ -17,5 +18,4 @@ public struct DirectoryItem: Identifiable, Hashable {
     let lastModified: Date?
     let creationDate: Date?
     let isHidden: Bool?
-    
 }

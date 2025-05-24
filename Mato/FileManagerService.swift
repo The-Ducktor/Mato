@@ -9,7 +9,7 @@ import Foundation
 import UniformTypeIdentifiers
 import AppKit
 
-
+@MainActor
 class FileManagerService {
     static let shared = FileManagerService()
     private let fileManager = FileManager.default

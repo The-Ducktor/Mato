@@ -19,6 +19,7 @@ struct PinnedFolder: Identifiable, Codable, Hashable {
     }
 }
 
+@MainActor
 class PinnedFolderStore: ObservableObject {
     @Published var pinnedFolders: [PinnedFolder] = []
     private let storeKey = "pinnedFolders"

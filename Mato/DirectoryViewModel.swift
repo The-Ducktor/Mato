@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import UniformTypeIdentifiers
 
 enum SortOption: String, CaseIterable {
     case name = "Name"
@@ -16,6 +17,7 @@ enum SortOption: String, CaseIterable {
     case type = "Type"
 }
 
+@MainActor
 class DirectoryViewModel: ObservableObject {
     @Published var items: [DirectoryItem] = []
     @Published var currentDirectory: URL?
@@ -53,27 +55,35 @@ class DirectoryViewModel: ObservableObject {
         // Update path string
         pathString = url.path
         
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+        // Capture the current state we need in the background task
+        let shouldHideHiddenFiles = hideHiddenFiles
+        let currentSortOption = sortOption
+        let currentSortAscending = sortAscending
+        
+        Task { [weak self, fileManager] in
             do {
-                guard let self = self else { return }
-                let contents = try self.fileManager.getContents(of: url)
+                // Get contents on background thread using captured fileManager
+                let contents = try await fileManager.getContents(of: url)
                 
                 // Filter hidden files if needed
-                let filteredContents = self.hideHiddenFiles ?
+                let filteredContents = shouldHideHiddenFiles ?
                     contents.filter { !($0.isHidden ?? false) } : contents
                 
-                // Sort the contents based on current sort options
-                let sortedContents = self.sortItems(filteredContents)
+                // Sort the contents based on captured sort options
+                let sortedContents = Self.sortItemsStatic(filteredContents,
+                                                         sortOption: currentSortOption,
+                                                         sortAscending: currentSortAscending)
                 
-                DispatchQueue.main.async {
-                    self.items = sortedContents
-                    self.isLoading = false
-                }
+                // Update UI on main actor
+                guard let self = self else { return }
+                self.items = sortedContents
+                self.isLoading = false
+                
             } catch {
-                DispatchQueue.main.async {
-                    self?.errorMessage = "Error loading directory: \(error.localizedDescription)"
-                    self?.isLoading = false
-                }
+                // Handle error on main actor
+                guard let self = self else { return }
+                self.errorMessage = "Error loading directory: \(error.localizedDescription)"
+                self.isLoading = false
             }
         }
     }
@@ -165,7 +175,17 @@ class DirectoryViewModel: ObservableObject {
         return formatter.string(fromByteCount: Int64(size))
     }
     
-    func sortItems(_ items: [DirectoryItem]) -> [DirectoryItem] {
+    // Made this function nonisolated and accept parameters to avoid concurrency issues
+    nonisolated func sortItems(_ items: [DirectoryItem],
+                              sortOption: SortOption,
+                              sortAscending: Bool) -> [DirectoryItem] {
+        return Self.sortItemsStatic(items, sortOption: sortOption, sortAscending: sortAscending)
+    }
+    
+    // Static version that can be called from detached tasks
+    nonisolated static func sortItemsStatic(_ items: [DirectoryItem],
+                                           sortOption: SortOption,
+                                           sortAscending: Bool) -> [DirectoryItem] {
         return items.sorted { item1, item2 in
             // Sort by chosen sort option
             switch sortOption {
