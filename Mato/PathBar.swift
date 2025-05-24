@@ -111,7 +111,7 @@ struct PathBar: View {
                     }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(viewModel.canNavigateBack() ? .blue : .gray.opacity(0.5))
+                            .foregroundColor(viewModel.canNavigateBack() ? Color.accentColor : .gray.opacity(0.5))
                             .frame(width: 24, height: 24)
                             .contentShape(Rectangle())
                     }
@@ -125,7 +125,7 @@ struct PathBar: View {
                     }) {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(viewModel.canNavigateForward() ? .blue : .gray.opacity(0.5))
+                            .foregroundColor(viewModel.canNavigateForward() ? Color.accentColor : .gray.opacity(0.5))
                             .frame(width: 24, height: 24)
                             .contentShape(Rectangle())
                     }
@@ -144,7 +144,7 @@ struct PathBar: View {
                 // Folder icon at the start
                 Image(systemName: "folder.fill")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.blue.opacity(0.8))
+                    .foregroundColor(Color.accentColor.opacity(0.8))
                     .padding(.leading, 4) // Reduced leading padding as we have navigation buttons now
                 
                 ForEach(Array(components.enumerated()), id: \.offset) { index, component in
@@ -158,7 +158,7 @@ struct PathBar: View {
                         // Clickable path component with fancy styling
                         Text(component)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(index == components.count - 1 ? .primary : .blue)
+                            .foregroundColor(index == components.count - 1 ? .primary : Color.accentColor)
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .padding(.horizontal, 6)
@@ -166,13 +166,13 @@ struct PathBar: View {
                             .background(
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(index == components.count - 1 ?
-                                          Color.blue.opacity(0.1) :
+                                          Color.accentColor.opacity(0.1) :
                                           Color.clear)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
                                     .stroke(index == components.count - 1 ?
-                                            Color.blue.opacity(0.3) :
+                                            Color.accentColor.opacity(0.3) :
                                             Color.clear, lineWidth: 1)
                             )
                             .contentShape(Rectangle())

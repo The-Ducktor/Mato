@@ -23,7 +23,7 @@ struct ContentView: View {
                     Button {
                         paneManager.activePane?.loadDownloadsDirectory()
                     } label: {
-                        Label("Downloads", systemImage: "folder")
+                        Label("Downloads", systemImage: "arrow.down.circle")
                     }
                     .buttonStyle(.plain)
                     
@@ -33,7 +33,7 @@ struct ContentView: View {
                         paneManager.activePane?.currentDirectory = homeURL
                         paneManager.activePane?.navigationStack = [homeURL]
                     } label: {
-                        Label("Home", systemImage: "folder")
+                        Label("Home", systemImage: "house")
                     }
                     .buttonStyle(.plain)
                 }
@@ -77,7 +77,7 @@ struct ContentView: View {
                             } label: {
                                 HStack {
                                     Circle()
-                                        .fill(paneManager.activePaneIndex == index ? .blue : .gray)
+                                        .fill(paneManager.activePaneIndex == index ? Color.accentColor : .gray)
                                         .frame(width: 8, height: 8)
                                     Text("Pane \(index + 1)")
                                     Spacer()
@@ -246,13 +246,13 @@ struct FileManagerPane: View {
                 
                 if isActive {
                     Circle()
-                        .fill(.blue)
+                        .fill(Color.accentColor)
                         .frame(width: 6, height: 6)
                 }
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(isActive ? .blue.opacity(0.1) : .clear)
+            .background(isActive ? Color.accentColor.opacity(0.1) : .clear)
             .contentShape(Rectangle()) // Make the entire header tappable
             .onTapGesture {
                 onActivate()
@@ -265,7 +265,7 @@ struct FileManagerPane: View {
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .stroke(isActive ? .blue : .gray.opacity(0.2), lineWidth: isActive ? 2 : 1)
+                .stroke(isActive ? Color.accentColor : .gray.opacity(0.2), lineWidth: isActive ? 2 : 1)
         )
         .animation(.easeInOut(duration: 0.2), value: isActive) // Smooth focus transition
     }
