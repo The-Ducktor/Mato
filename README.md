@@ -1,64 +1,64 @@
 # Mato
+<img src="Mato/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" alt="Mato logo ('ChatGPT')">
 
-A lightweight, modern file manager for macOS.
+A small, rough-around-the-edges macOS file manager that exists because I really, *really* don't like Finder.
 
-![Mato Logo](Mato/Assets.xcassets/AppIcon.appiconset/icon_256x256.png)
+## What is this?
 
-## Features
+This is what happens when weekend frustration meets SwiftUI curiosity. **mato** is a minimal file manager I built not because I had revolutionary ideas about file management, but because using Finder makes me want to throw my laptop out the window.
 
-- **Clean, Modern Interface** - Simple and intuitive design for effortless file navigation
-- **Quick Access** - Easily access downloads folder and home directory  
-- **Pinnable Folders** - Save your frequently used folders for faster access
-- **Path Navigation Bar** - Convenient breadcrumb navigation and direct path entry
-- **File Preview** - Built-in QuickLook preview for supported file types
-- **File Sorting** - Sort by name, date added, date modified, size, or file type
-- **File Details** - View detailed file information including size, type, and modification date
+It's a sketch of a file manager — functional enough to browse files without wanting to scream, rough enough that you'll definitely find bugs, and honest enough to admit it's not going anywhere special.
 
-## Requirements
+## What it does
 
-- macOS 12.0 or later
-- Xcode 14.0+ (for development)
+- Multi-pane browsing (because tabs are for websites)
+- Address bar (revolutionary, I know)
+- Clean, minimal interface (mostly because I ran out of weekend)
+- Basic file operations (the ones that actually work)
+- Exists as an alternative to Finder (the bar was not high)
 
-## Usage
+## What it doesn't do
 
-### Navigation
-- Use the sidebar to access pinned locations or quick access folders
-- Double-click folders to navigate into them
-- Use breadcrumb navigation in the path bar for quick traversal
-- Press spacebar to preview selected files
+- Handle file system events gracefully
+- Scale beyond "works on my machine"
+- Have a roadmap, vision, or sustainable future
+- Pretend to be production-ready
+- Make you coffee (yet)
 
-### Managing Files
-- Right-click files or folders for additional options
-- Add frequently used folders to your pinned folders list
-- Sort files by clicking on column headers
-- Use the search field to filter files in the current directory
+## Why does this exist?
 
-## Screenshots
+Because sometimes you build things not to solve the world's problems, but to solve the very specific problem of "I hate the default file manager and have too much time on weekends."
 
-![Main Interface](screenshots/main_interface.png)
-*The main interface showing directory listing and sidebar*
+This isn't a Finder killer — it's more like Finder's weird cousin who shows up uninvited but is surprisingly decent company.
 
-![Quick Look Preview](screenshots/quick_look.png)
-*Built-in file preview with QuickLook*
+## Should you use this?
 
-## Development
+¯\\_(ツ)_/¯
 
-Mato is built with:
-- SwiftUI for the user interface
-- AppKit integration for native macOS features
-- QuickLook for file previews
+If you're the kind of person who:
+- Enjoys tinkering with rough-around-the-edges software
+- Also has strong feelings about Finder
+- Appreciates honest mediocrity over polished disappointment
+- Has realistic expectations about weekend projects
 
+Then sure, give it a spin. Just don't expect miracles.
+
+## Installation
+
+1. Clone this repo
+2. Open in Xcode
+3. Build and run
+4. Lower your expectations
+5. Enjoy (or don't, that's fine too)
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+I'm not really maintaining this in any serious way, but if you find it useful and want to fix something or add a feature, feel free to open a PR. I can't promise I'll be responsive, but I can promise I'll be grateful.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+## License
 
+MIT — because even questionable weekend projects deserve to be free.
 
+---
 
-Made with 💀 by [The Ducktor]
+*Built with SwiftUI, weekend energy, and a disproportionate amount of Finder-related anger.*
