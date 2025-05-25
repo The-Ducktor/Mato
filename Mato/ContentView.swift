@@ -11,11 +11,11 @@ struct ContentView: View {
     @State private var searchText: String = ""
     @StateObject private var pinnedFolderStore = PinnedFolderStore.shared
     @State private var showingAddPinnedFolderSheet = false
-    
+
     // Multiple panes management
     @StateObject private var paneManager = PaneManager()
     @State private var showingPaneSelector = false
-    
+
     var body: some View {
         NavigationSplitView {
             List {
@@ -26,7 +26,7 @@ struct ContentView: View {
                         Label("Downloads", systemImage: "arrow.down.circle")
                     }
                     .buttonStyle(.plain)
-                    
+
                     Button {
                         let homeURL = FileManager.default.homeDirectoryForCurrentUser
                         paneManager.activePane?.loadDirectory(at: homeURL)
@@ -37,7 +37,7 @@ struct ContentView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                
+
                 Section {
                     ForEach(pinnedFolderStore.pinnedFolders) { folder in
                         Button {
@@ -54,7 +54,7 @@ struct ContentView: View {
                             }
                         }
                     }
-                    
+
                     Button("Pin Current Folder") {
                         if let currentURL = paneManager.activePane?.currentDirectory {
                             pinnedFolderStore.addPinnedFolder(currentURL)
@@ -68,7 +68,7 @@ struct ContentView: View {
                         Spacer()
                     }
                 }
-                
+
                 Section("Panes") {
                     ForEach(paneManager.panes.indices, id: \.self) { index in
                         HStack {
@@ -87,7 +87,7 @@ struct ContentView: View {
                                 }
                             }
                             .buttonStyle(.plain)
-                            
+
                             if paneManager.panes.count > 1 {
                                 Button {
                                     paneManager.removePane(at: index)
@@ -99,7 +99,7 @@ struct ContentView: View {
                             }
                         }
                     }
-                    
+
                     Button("Add Pane") {
                         paneManager.addPane()
                     }
@@ -126,14 +126,14 @@ struct ContentView: View {
                             .padding(.vertical, 4)
                             .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
                     }
-                    
+
                     // Principal toolbar item (center - search)
                     ToolbarItem(placement: .principal) {
                         HStack {
                             TextField("Search", text: $searchText)
                                 .textFieldStyle(.roundedBorder)
                                 .frame(minWidth: 200, maxWidth: 400)
-                            
+
                             // Clear search button
                             if !searchText.isEmpty {
                                 Button {
@@ -146,7 +146,7 @@ struct ContentView: View {
                             }
                         }
                     }
-                    
+
                     // Trailing toolbar items (right side)
                     ToolbarItemGroup(placement: .primaryAction) {
                         // Layout selector
@@ -154,20 +154,20 @@ struct ContentView: View {
                             Button("Single Pane") {
                                 paneManager.setLayout(.single)
                             }
-                            
+
                             Button("Dual Pane") {
                                 paneManager.setLayout(.dual)
                                 if paneManager.panes.count < 2 {
                                     paneManager.addPane()
                                 }
                             }
-                            
+
                             if paneManager.panes.count >= 3 {
                                 Button("Triple Pane") {
                                     paneManager.setLayout(.triple)
                                 }
                             }
-                            
+
                             if paneManager.panes.count >= 4 {
                                 Button("Quad Pane") {
                                     paneManager.setLayout(.quad)
@@ -177,7 +177,7 @@ struct ContentView: View {
                             Image(systemName: layoutIcon(for: paneManager.layout))
                         }
                         .help("Change Layout")
-                        
+
                         // Add pane button
                         Button {
                             paneManager.addPane()
@@ -186,7 +186,7 @@ struct ContentView: View {
                         }
                         .disabled(paneManager.panes.count >= 4)
                         .help("Add Pane")
-                        
+
                         // Remove active pane button
                         if paneManager.panes.count > 1 {
                             Button {
@@ -209,7 +209,7 @@ struct ContentView: View {
             }
         }
     }
-    
+
     // Helper function to get the appropriate icon for each layout
     private func layoutIcon(for layout: PaneLayout) -> String {
         switch layout {
@@ -230,7 +230,7 @@ struct FileManagerPane: View {
     @ObservedObject var viewModel: DirectoryViewModel
     let isActive: Bool
     let onActivate: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 0) {
             // Pane header - more compact
@@ -241,9 +241,9 @@ struct FileManagerPane: View {
                     .foregroundStyle(isActive ? .primary : .secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                
+
                 Spacer()
-                
+
                 if isActive {
                     Circle()
                         .fill(Color.accentColor)
@@ -257,7 +257,7 @@ struct FileManagerPane: View {
             .onTapGesture {
                 onActivate()
             }
-            
+
             // Directory content - pass onActivate to DirectoryView
             DirectoryView(viewModel: viewModel, onActivate: onActivate)
         }
@@ -277,34 +277,34 @@ class PaneManager: ObservableObject {
     @Published var panes: [DirectoryViewModel] = []
     @Published var activePaneIndex: Int = 0
     @Published var layout: PaneLayout = .dual
-    
+
     var activePane: DirectoryViewModel? {
         guard activePaneIndex < panes.count else { return nil }
         return panes[activePaneIndex]
     }
-    
+
     init() {
         // Don't create panes in init - do it in onAppear of the view
     }
-    
+
     func addPane() {
         guard panes.count < 4 else { return } // Maximum 4 panes
         let newPane = DirectoryViewModel()
         panes.append(newPane)
     }
-    
+
     func removePane(at index: Int) {
         guard panes.count > 1, index < panes.count else { return }
-        
+
         panes.remove(at: index)
-        
+
         // Adjust active pane index
         if activePaneIndex >= panes.count {
             activePaneIndex = panes.count - 1
         } else if activePaneIndex > index {
             activePaneIndex -= 1
         }
-        
+
         // Adjust layout if necessary
         if panes.count == 1 {
             layout = .single
@@ -314,12 +314,12 @@ class PaneManager: ObservableObject {
             layout = .triple
         }
     }
-    
+
     func setActivePane(index: Int) {
         guard index < panes.count else { return }
         activePaneIndex = index
     }
-    
+
     func setLayout(_ newLayout: PaneLayout) {
         layout = newLayout
     }
@@ -337,13 +337,13 @@ struct AddPinnedFolderView: View {
     @State private var folderName: String = ""
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var pinnedFolderStore = PinnedFolderStore.shared
-    
+
     var body: some View {
         VStack {
             Text("Add Pinned Folder")
                 .font(.title2)
                 .padding()
-            
+
             VStack(alignment: .leading) {
                 HStack {
                     Text("Folder:")
@@ -353,7 +353,7 @@ struct AddPinnedFolderView: View {
                         panel.canChooseFiles = false
                         panel.canChooseDirectories = true
                         panel.allowsMultipleSelection = false
-                        
+
                         if panel.runModal() == .OK {
                             folderURL = panel.url
                             if folderName.isEmpty {
@@ -362,7 +362,7 @@ struct AddPinnedFolderView: View {
                         }
                     }
                 }
-                
+
                 if let url = folderURL {
                     Text(url.path)
                         .font(.caption)
@@ -370,21 +370,21 @@ struct AddPinnedFolderView: View {
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
-                
+
                 TextField("Custom Name (Optional)", text: $folderName)
                     .textFieldStyle(.roundedBorder)
                     .padding(.vertical)
             }
             .padding()
-            
+
             HStack {
                 Button("Cancel") {
                     dismiss()
                 }
                 .keyboardShortcut(.escape)
-                
+
                 Spacer()
-                
+
                 Button("Add") {
                     if let url = folderURL {
                         pinnedFolderStore.addPinnedFolder(url, name: folderName.isEmpty ? nil : folderName)

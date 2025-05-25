@@ -21,6 +21,10 @@ struct PaneAreaView: View {
                             isActive: true,
                             onActivate: { }
                         )
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // Already active in single pane mode
+                        }
                     }
                     
                 case .dual:
@@ -56,6 +60,10 @@ struct ResizableDualPaneView: View {
                         onActivate: { paneManager.setActivePane(index: 0) }
                     )
                     .frame(width: geometry.size.width * splitPosition)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        paneManager.setActivePane(index: 0)
+                    }
                 }
                 
                 if paneManager.panes.count >= 2 {
@@ -73,6 +81,10 @@ struct ResizableDualPaneView: View {
                         onActivate: { paneManager.setActivePane(index: 1) }
                     )
                     .frame(width: geometry.size.width * (1 - splitPosition))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        paneManager.setActivePane(index: 1)
+                    }
                 }
             }
         }
@@ -110,6 +122,10 @@ struct ResizableTriplePaneView: View {
                         onActivate: { paneManager.setActivePane(index: index) }
                     )
                     .frame(width: paneWidth(for: index, in: geometry.size.width))
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        paneManager.setActivePane(index: index)
+                    }
                 }
             }
         }
@@ -148,6 +164,10 @@ struct ResizableQuadPaneView: View {
                             onActivate: { paneManager.setActivePane(index: 0) }
                         )
                         .frame(width: geometry.size.width * topLeftWidth)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            paneManager.setActivePane(index: 0)
+                        }
                     }
                     
                     if paneManager.panes.count >= 2 {
@@ -164,6 +184,10 @@ struct ResizableQuadPaneView: View {
                             onActivate: { paneManager.setActivePane(index: 1) }
                         )
                         .frame(width: geometry.size.width * (1 - topLeftWidth))
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            paneManager.setActivePane(index: 1)
+                        }
                     }
                 }
                 .frame(height: geometry.size.height * verticalSplit)
@@ -185,6 +209,10 @@ struct ResizableQuadPaneView: View {
                             onActivate: { paneManager.setActivePane(index: 2) }
                         )
                         .frame(width: geometry.size.width * bottomLeftWidth)
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            paneManager.setActivePane(index: 2)
+                        }
                         
                         if paneManager.panes.count >= 4 {
                             NativeResizeHandle(
@@ -200,6 +228,10 @@ struct ResizableQuadPaneView: View {
                                 onActivate: { paneManager.setActivePane(index: 3) }
                             )
                             .frame(width: geometry.size.width * (1 - bottomLeftWidth))
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                paneManager.setActivePane(index: 3)
+                            }
                         }
                     }
                     .frame(height: geometry.size.height * (1 - verticalSplit))

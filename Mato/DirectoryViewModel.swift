@@ -56,10 +56,13 @@ class DirectoryViewModel: ObservableObject {
                 // Filter hidden files if needed
                 let filteredContents = shouldHideHiddenFiles ?
                 contents.filter { !($0.isHidden) } : contents
+                
+                // sort by date newest first
+                let sortedContents = filteredContents.sorted { $0.lastModified > $1.lastModified }
 
                 // Set items directly, no sorting.
                 guard let self = self else { return }
-                self.items = filteredContents
+                self.items = sortedContents
                 self.isLoading = false
 
             } catch {

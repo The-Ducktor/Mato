@@ -17,11 +17,9 @@ struct ImageIcon: View {
     @State private var isLoading: Bool = false
 
     private var image: NSImage {
-        if previewImage, let thumbnail = thumbnail {
-            return thumbnail
-        } else {
+        
             return NSWorkspace.shared.icon(forFile: item.url.path)
-        }
+        
     }
 
     var body: some View {
