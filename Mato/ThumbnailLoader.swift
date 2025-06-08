@@ -1,133 +1,101 @@
 import Foundation
+@preconcurrency import QuickLookThumbnailing
 import AppKit
-import QuickLookThumbnailing
 
-class ThumbnailLoader: ObservableObject {
-    @Published var thumbnails: [ThumbnailKey: NSImage] = [:]
-
-    private let generator = QLThumbnailGenerator.shared
-    private let memoryCache = NSCache<NSString, NSImage>()
-    private var pendingRequests: Set<ThumbnailKey> = []
-
-    struct ThumbnailKey: Hashable {
-        let url: URL
-        let maxSize: CGSize
+@MainActor
+final class SimpleThumbnailLoader: ObservableObject {
+    
+    // MARK: - Types
+    
+    enum ThumbnailError: Error, LocalizedError {
+        case thumbnailGenerationFailed
+        case invalidURL
         
-        // Use maxSize instead of exact size since we'll preserve aspect ratio
-        init(url: URL, maxSize: CGSize) {
-            self.url = url
-            self.maxSize = maxSize
-        }
-    }
-
-    func thumbnail(for url: URL, maxWidth: CGFloat = 64, maxHeight: CGFloat = 64) -> NSImage? {
-        let maxSize = CGSize(width: maxWidth, height: maxHeight)
-        let key = ThumbnailKey(url: url, maxSize: maxSize)
-        let cacheKey = self.cacheKey(for: key)
-
-        // 1. Memory Cache
-        if let cached = memoryCache.object(forKey: cacheKey) {
-            return cached
-        }
-
-        // 2. Published In-Memory Store
-        if let image = thumbnails[key] {
-            return image
-        }
-
-        // 3. Disk Cache
-        if let diskImage = loadFromDisk(for: key) {
-            memoryCache.setObject(diskImage, forKey: cacheKey)
-            thumbnails[key] = diskImage
-            return diskImage
-        }
-
-        // 4. Generate Thumbnail (async)
-        generateThumbnail(for: key)
-
-        return nil
-    }
-
-    private func generateThumbnail(for key: ThumbnailKey) {
-        guard !pendingRequests.contains(key) else { return }
-        pendingRequests.insert(key)
-
-        // Use the maximum dimension to ensure we get enough resolution
-        // while letting QuickLook handle the aspect ratio
-        let maxDimension = max(key.maxSize.width, key.maxSize.height)
-        let requestSize = CGSize(width: maxDimension, height: maxDimension)
-
-        let request = QLThumbnailGenerator.Request(
-            fileAt: key.url,
-            size: requestSize,
-            scale: NSScreen.main?.backingScaleFactor ?? 2,
-            representationTypes: .all
-        )
-
-        generator.generateBestRepresentation(for: request) { [weak self] thumbnail, error in
-            guard let self = self else { return }
-            defer { self.pendingRequests.remove(key) }
-
-            guard let cgImage = thumbnail?.cgImage else { return }
-
-            // Get the actual size from the generated thumbnail
-            let actualSize = CGSize(width: cgImage.width, height: cgImage.height)
-            
-            // Calculate the size that fits within our bounds while preserving aspect ratio
-            let scaledSize = self.calculateScaledSize(originalSize: actualSize, maxSize: key.maxSize)
-            
-            // Create the image with the actual thumbnail size
-            // NSImage will handle the display scaling appropriately
-            let image = NSImage(cgImage: cgImage, size: scaledSize)
-            let cacheKey = self.cacheKey(for: key)
-
-            // Save to memory, disk, and update UI
-            self.memoryCache.setObject(image, forKey: cacheKey)
-            self.saveToDisk(image: image, for: key)
-
-            DispatchQueue.main.async {
-                self.thumbnails[key] = image
+        var errorDescription: String? {
+            switch self {
+            case .thumbnailGenerationFailed:
+                return "Failed to generate thumbnail"
+            case .invalidURL:
+                return "Invalid file URL"
             }
         }
     }
-
-    // Calculate the size that fits within maxSize while preserving aspect ratio
-    private func calculateScaledSize(originalSize: CGSize, maxSize: CGSize) -> CGSize {
-        let widthRatio = maxSize.width / originalSize.width
-        let heightRatio = maxSize.height / originalSize.height
-        let scale = min(widthRatio, heightRatio)
+    
+    struct ThumbnailOptions: Sendable {
+        let size: CGSize
+        let scale: CGFloat
         
-        return CGSize(
-            width: originalSize.width * scale,
-            height: originalSize.height * scale
-        )
-    }
-
-    // MARK: - Disk Cache
-
-    private func diskCacheURL(for key: ThumbnailKey) -> URL {
-        let name = "\(key.url.path)_\(Int(key.maxSize.width))x\(Int(key.maxSize.height))"
-        let hashed = name.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? "thumb"
-        return FileManager.default.temporaryDirectory.appendingPathComponent("\(hashed).png")
-    }
-
-    private func saveToDisk(image: NSImage, for key: ThumbnailKey) {
-        guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let pngData = bitmap.representation(using: .png, properties: [:]) else {
-            return
+        init(size: CGSize = CGSize(width: 256, height: 256), scale: CGFloat = 2.0) {
+            self.size = size
+            self.scale = scale
         }
-        try? pngData.write(to: diskCacheURL(for: key))
     }
-
-    private func loadFromDisk(for key: ThumbnailKey) -> NSImage? {
-        let url = diskCacheURL(for: key)
-        return NSImage(contentsOf: url)
+    
+    // MARK: - Properties
+    
+    private let thumbnailGenerator = QLThumbnailGenerator.shared
+    private let imageCache = NSCache<NSURL, NSImage>()
+    
+    // MARK: - Initialization
+    
+    init() {
+        setupCache()
     }
-
-    // MARK: - Cache Key
-
-    private func cacheKey(for key: ThumbnailKey) -> NSString {
-        "\(key.url.absoluteString)_\(Int(key.maxSize.width))x\(Int(key.maxSize.height))" as NSString
+    
+    private func setupCache() {
+        imageCache.countLimit = 100
+        imageCache.totalCostLimit = 50 * 1024 * 1024 // 50MB
+    }
+    
+    // MARK: - Public Methods
+    
+    /// Generate a thumbnail using QuickLook
+    func generateThumbnail(for url: URL, options: ThumbnailOptions = ThumbnailOptions()) async throws -> NSImage {
+        guard url.isFileURL else {
+            throw ThumbnailError.invalidURL
+        }
+        
+        // Check cache first
+        if let cachedImage = imageCache.object(forKey: url as NSURL) {
+            return cachedImage
+        }
+        
+        let thumbnail = try await generateQuickLookThumbnail(for: url, options: options)
+        imageCache.setObject(thumbnail, forKey: url as NSURL)
+        return thumbnail
+    }
+    
+    // MARK: - Private Methods
+    
+    private func generateQuickLookThumbnail(for url: URL, options: ThumbnailOptions) async throws -> NSImage {
+        return try await withCheckedThrowingContinuation { continuation in
+            let request = QLThumbnailGenerator.Request(
+                fileAt: url,
+                size: options.size,
+                scale: options.scale,
+                representationTypes: .all
+            )
+            
+            thumbnailGenerator.generateBestRepresentation(for: request) { representation, error in
+                Task { @MainActor in
+                    if let representation = representation {
+                        let nsImage = NSImage(cgImage: representation.cgImage, size: options.size)
+                        continuation.resume(returning: nsImage)
+                    } else {
+                        continuation.resume(throwing: error ?? ThumbnailError.thumbnailGenerationFailed)
+                    }
+                }
+            }
+        }
+    }
+    
+    // MARK: - Cache Management
+    
+    func clearCache() {
+        imageCache.removeAllObjects()
+    }
+    
+    func removeCachedThumbnail(for url: URL) {
+        imageCache.removeObject(forKey: url as NSURL)
     }
 }

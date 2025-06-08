@@ -40,13 +40,13 @@ struct PathBar: View {
                 .shadow(color: .black.opacity(0.05), radius: 1, x: 0, y: 1)
         )
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: isEditing)
-        .onChange(of: viewModel.currentDirectory) { newValue in
+        .onChange(of: viewModel.currentDirectory) {
             if let directory = viewModel.currentDirectory {
                 path = directory
                 pathString = directory.path
             }
         }
-        .onChange(of: isTextFieldFocused) { focused in
+        .onChange(of: isTextFieldFocused) { _ ,focused in
             if !focused && isEditing {
                 // Auto-commit when focus is lost
                 commitEdit()
@@ -111,7 +111,7 @@ struct PathBar: View {
                     }) {
                         Image(systemName: "chevron.left")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(viewModel.canNavigateBack() ? .blue : .gray.opacity(0.5))
+                            .foregroundColor(viewModel.canNavigateBack() ? Color.accentColor : .gray.opacity(0.5))
                             .frame(width: 24, height: 24)
                             .contentShape(Rectangle())
                     }
@@ -125,7 +125,7 @@ struct PathBar: View {
                     }) {
                         Image(systemName: "chevron.right")
                             .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(viewModel.canNavigateForward() ? .blue : .gray.opacity(0.5))
+                            .foregroundColor(viewModel.canNavigateForward() ? Color.accentColor : .gray.opacity(0.5))
                             .frame(width: 24, height: 24)
                             .contentShape(Rectangle())
                     }
@@ -144,7 +144,7 @@ struct PathBar: View {
                 // Folder icon at the start
                 Image(systemName: "folder.fill")
                     .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(.blue.opacity(0.8))
+                    .foregroundColor(Color.accentColor.opacity(0.8))
                     .padding(.leading, 4) // Reduced leading padding as we have navigation buttons now
                 
                 ForEach(Array(components.enumerated()), id: \.offset) { index, component in
@@ -155,10 +155,10 @@ struct PathBar: View {
                             .foregroundColor(.secondary.opacity(0.6))
                             .padding(.horizontal, 3)
                         
-                        // Clickable path component with fancy styling
+                        // Clickable path component with fancy styling and context menu
                         Text(component)
                             .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(index == components.count - 1 ? .primary : .blue)
+                            .foregroundColor(index == components.count - 1 ? .primary : Color.accentColor)
                             .lineLimit(1)
                             .truncationMode(.middle)
                             .padding(.horizontal, 6)
@@ -166,13 +166,13 @@ struct PathBar: View {
                             .background(
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(index == components.count - 1 ?
-                                          Color.blue.opacity(0.1) :
+                                          Color.accentColor.opacity(0.1) :
                                           Color.clear)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 4)
                                     .stroke(index == components.count - 1 ?
-                                            Color.blue.opacity(0.3) :
+                                            Color.accentColor.opacity(0.3) :
                                             Color.clear, lineWidth: 1)
                             )
                             .contentShape(Rectangle())
@@ -181,6 +181,9 @@ struct PathBar: View {
                             }
                             .onHover { isHovering in
                                 // Could add visual hover effects here
+                            }
+                            .contextMenu {
+                                contextMenuForComponent(at: index, components: originalComponents, displayComponent: component)
                             }
                             .allowsHitTesting(true) // Ensure path components are clickable
                     }
@@ -200,6 +203,86 @@ struct PathBar: View {
                 .allowsHitTesting(true) // Ensure button is clickable
             }
             .allowsHitTesting(true) // Make sure the HStack and its contents can receive events
+        }
+    }
+    
+    // MARK: - Context Menu
+    @ViewBuilder
+    private func contextMenuForComponent(at index: Int, components: [String], displayComponent: String) -> some View {
+        let targetPath = getPathForComponent(at: index, components: components)
+        
+        Button(action: {
+            navigateToComponent(at: index, components: components)
+        }) {
+            Label("Go to \(displayComponent)", systemImage: "folder")
+        }
+        
+        Button(action: {
+            copyPathToClipboard(targetPath)
+        }) {
+            Label("Copy Path", systemImage: "doc.on.doc")
+        }
+        
+        Button(action: {
+            showInFinder(targetPath)
+        }) {
+            Label("Show in Finder", systemImage: "magnifyingglass")
+        }
+        
+        Divider()
+        
+        Button(action: {
+            openInTerminal(targetPath)
+        }) {
+            Label("Open in Terminal", systemImage: "terminal")
+        }
+    }
+    
+    // MARK: - Helper Methods for Context Menu Actions
+    
+    private func getPathForComponent(at index: Int, components: [String]) -> String {
+        // Special case for home directory (~)
+        let displayComponents = pathComponents(path: URL(fileURLWithPath: pathString))
+        if index < displayComponents.count && displayComponents[index] == "~" {
+            return FileManager.default.homeDirectoryForCurrentUser.path
+        }
+        
+        // For typical file paths, rebuild the path based on original components
+        let fullPath = URL(fileURLWithPath: pathString)
+        let levelsUp = displayComponents.count - index - 1
+        
+        var targetPath = fullPath
+        for _ in 0..<levelsUp {
+            targetPath = targetPath.deletingLastPathComponent()
+        }
+        
+        return targetPath.path
+    }
+    
+    private func copyPathToClipboard(_ path: String) {
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(path, forType: .string)
+        
+        // Optional: Show a brief confirmation (you could add a toast notification here)
+        print("Copied path to clipboard: \(path)")
+    }
+    
+    private func showInFinder(_ path: String) {
+        let url = URL(fileURLWithPath: path)
+        NSWorkspace.shared.selectFile(path, inFileViewerRootedAtPath: url.deletingLastPathComponent().path)
+    }
+    
+    private func openInTerminal(_ path: String) {
+        let script = """
+        tell application "Terminal"
+            activate
+            do script "cd '\(path.replacingOccurrences(of: "'", with: "\\'"))'"
+        end tell
+        """
+        
+        if let appleScript = NSAppleScript(source: script) {
+            appleScript.executeAndReturnError(nil)
         }
     }
     

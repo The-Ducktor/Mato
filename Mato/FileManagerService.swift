@@ -9,7 +9,7 @@ import Foundation
 import UniformTypeIdentifiers
 import AppKit
 
-
+@MainActor
 class FileManagerService {
     static let shared = FileManagerService()
     private let fileManager = FileManager.default
@@ -41,10 +41,10 @@ class FileManagerService {
                 
                 let isDirectory = resourceValues.isDirectory ?? false
                 let fileName = url.lastPathComponent
-                let fileSize = resourceValues.fileSize
-                let fileType = resourceValues.contentType
-                let modificationDate = resourceValues.contentModificationDate
-                let creationDate = resourceValues.creationDate
+                let fileSize = resourceValues.fileSize ?? 0
+                let fileType = resourceValues.contentType ?? UTType.data
+                let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
+                let creationDate = resourceValues.creationDate ?? Date.distantPast
                 let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
                 
                 
@@ -68,5 +68,34 @@ class FileManagerService {
     
     func openFile(at url: URL) {
         NSWorkspace.shared.open(url)
+    }
+    
+    // Move or copy files to a destination directory
+    func moveItems(from sourceURLs: [URL], to destinationDirectory: URL, copy: Bool = false) async throws -> Bool {
+        var success = true
+        
+        for sourceURL in sourceURLs {
+            let destinationURL = destinationDirectory.appendingPathComponent(sourceURL.lastPathComponent)
+            
+            do {
+                // Check if an item with the same name already exists
+                if fileManager.fileExists(atPath: destinationURL.path) {
+                    // Handle conflict (could be expanded to show a confirmation dialog)
+                    print("File already exists at destination: \(destinationURL.path)")
+                    continue
+                }
+                
+                if copy {
+                    try fileManager.copyItem(at: sourceURL, to: destinationURL)
+                } else {
+                    try fileManager.moveItem(at: sourceURL, to: destinationURL)
+                }
+            } catch {
+                print("Error moving/copying \(sourceURL) to \(destinationURL): \(error)")
+                success = false
+            }
+        }
+        
+        return success
     }
 }
