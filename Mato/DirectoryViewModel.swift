@@ -443,23 +443,43 @@ class DirectoryViewModel: ObservableObject {
         }
     }
 
+    func moveFiles(from sourceURLs: [URL], to destinationURL: URL) {
+        Task {
+            do {
+                for sourceURL in sourceURLs {
+                    try fileManager.moveFile(from: sourceURL, to: destinationURL)
+                }
+                refreshCurrentDirectory()
+            } catch {
+                errorMessage = "Error moving files: \(error.localizedDescription)"
+            }
+        }
+    }
+
     func handleDrop(info: DropInfo) -> Bool {
-        guard let itemProvider = info.itemProviders(for: [.fileURL]).first else {
-            return false
+        let itemProviders = info.itemProviders(for: [.fileURL])
+        guard !itemProviders.isEmpty else { return false }
+
+        var urls: [URL] = []
+        let dispatchGroup = DispatchGroup()
+
+        for itemProvider in itemProviders {
+            dispatchGroup.enter()
+            itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
+                if let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+                    urls.append(url)
+                }
+                dispatchGroup.leave()
+            }
         }
 
-        itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { [weak self] (data, error) in
-            guard let self = self, let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) else {
-                return
-            }
-
+        dispatchGroup.notify(queue: .main) {
             Task { @MainActor in
                 if let destinationURL = self.currentDirectory {
-                    self.moveFile(from: url, to: destinationURL)
+                    self.moveFiles(from: urls, to: destinationURL)
                 }
             }
         }
-
         return true
     }
 

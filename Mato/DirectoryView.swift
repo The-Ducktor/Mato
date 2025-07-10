@@ -92,13 +92,25 @@ struct DirectoryView: View {
     // MARK: - Drag and Drop
 
     private func dragProvider() -> NSItemProvider {
-        let selectedItems = viewModel.items.filter { self.selectedItems.contains($0.id) }
-        let providers = selectedItems.map { item -> NSItemProvider in
-            let provider = NSItemProvider(item: item.url as NSURL, typeIdentifier: UTType.fileURL.identifier)
-            provider.suggestedName = item.name
-            return provider
+        let selectedURLs = selectedItems.compactMap { id in
+            viewModel.items.first { $0.id == id }?.url
         }
-        return providers.first ?? NSItemProvider()
+
+        guard !selectedURLs.isEmpty else { return NSItemProvider() }
+
+        let provider = NSItemProvider()
+
+        provider.registerDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier, visibility: .all) { completion in
+            do {
+                let data = try NSKeyedArchiver.archivedData(withRootObject: selectedURLs, requiringSecureCoding: false)
+                completion(data, nil)
+                return nil // Return nil for the progress object
+            } catch {
+                completion(nil, error)
+                return nil // Return nil for the progress object
+            }
+        }
+        return provider
     }
 
     // MARK: - Sorting Helper

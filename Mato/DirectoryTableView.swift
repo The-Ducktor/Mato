@@ -42,7 +42,7 @@ struct DirectoryTableView: View {
         } rows: {
             ForEach(viewModel.items) { item in
                 TableRow(item)
-                    .draggable(item)
+                    .draggable(item.url)
             }
         }
         .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
@@ -70,10 +70,30 @@ struct TableDropDelegate: DropDelegate {
     let viewModel: DirectoryViewModel
     
     func performDrop(info: DropInfo) -> Bool {
-        // Handle the drop operation here
-        // You can access the drop location and perform the appropriate action
-       
-        return viewModel.handleDrop(info: info)
+        let itemProviders = info.itemProviders(for: [.fileURL])
+        guard !itemProviders.isEmpty else { return false }
+
+        var urls: [URL] = []
+        let dispatchGroup = DispatchGroup()
+
+        for itemProvider in itemProviders {
+            dispatchGroup.enter()
+            itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
+                if let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+                    urls.append(url)
+                }
+                dispatchGroup.leave()
+            }
+        }
+
+        dispatchGroup.notify(queue: .main) {
+            Task { @MainActor in
+                if let currentDirectory = viewModel.currentDirectory {
+                    viewModel.moveFiles(from: urls, to: currentDirectory)
+                }
+            }
+        }
+        return true
     }
     
     func dropEntered(info: DropInfo) {

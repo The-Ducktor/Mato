@@ -37,19 +37,26 @@ struct ItemDropDelegate: DropDelegate {
             return false
         }
 
-        guard let provider = info.itemProviders(for: [.fileURL]).first else {
-            return false
+        let itemProviders = info.itemProviders(for: [.fileURL])
+        guard !itemProviders.isEmpty else { return false }
+
+        var sourceURLs: [URL] = []
+        let dispatchGroup = DispatchGroup()
+
+        for itemProvider in itemProviders {
+            dispatchGroup.enter()
+            itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
+                if let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+                    sourceURLs.append(url)
+                }
+                dispatchGroup.leave()
+            }
         }
 
-        provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-            guard let urlData = data as? Data, let sourceURL = URL(dataRepresentation: urlData, relativeTo: nil) else {
-                return
-            }
-
+        dispatchGroup.notify(queue: .main) {
             let destinationURL = item.url
-
             Task { @MainActor in
-                viewModel.moveFile(from: sourceURL, to: destinationURL)
+                viewModel.moveFiles(from: sourceURLs, to: destinationURL)
             }
         }
 
