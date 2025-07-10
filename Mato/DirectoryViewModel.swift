@@ -27,6 +27,9 @@ class DirectoryViewModel: ObservableObject {
 
     private let fileManager = FileManagerService.shared
 
+    // Directory watching service
+    private var directoryWatcherService: DirectoryWatcherService?
+
     init() {
         loadDownloadsDirectory()
     }
@@ -50,6 +53,16 @@ class DirectoryViewModel: ObservableObject {
         // Update path string
         pathString = url.path
 
+        // Stop previous watcher by releasing the service (handled by ARC)
+        directoryWatcherService = nil
+
+        // Start watching new directory
+        directoryWatcherService = DirectoryWatcherService(url: url, queue: .main) { [weak self] in
+            Task { @MainActor in
+                self?.refreshCurrentDirectory()
+            }
+        }
+
         // Capture the current state we need in the background task
         let shouldHideHiddenFiles = hideHiddenFiles
 
@@ -61,7 +74,7 @@ class DirectoryViewModel: ObservableObject {
                 // Filter hidden files if needed
                 let filteredContents = shouldHideHiddenFiles ?
                 contents.filter { !($0.isHidden) } : contents
-                
+
                 // sort by date newest first
                 let sortedContents = filteredContents.sorted { $0.lastModified > $1.lastModified }
 
@@ -165,7 +178,7 @@ class DirectoryViewModel: ObservableObject {
         formatter.countStyle = .file
         return formatter.string(fromByteCount: Int64(size))
     }
-    
+
     // MARK: - Context Menu Actions
 
     func openSelectedItems(_ ids: Set<DirectoryItem.ID>) {
@@ -311,7 +324,7 @@ class DirectoryViewModel: ObservableObject {
         }
     }
 
-    
+
 
     func showInFinder(_ ids: Set<DirectoryItem.ID>) {
         let urls = getURLs(from: ids)
@@ -439,7 +452,7 @@ class DirectoryViewModel: ObservableObject {
             guard let self = self, let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) else {
                 return
             }
-            
+
             Task { @MainActor in
                 if let destinationURL = self.currentDirectory {
                     self.moveFile(from: url, to: destinationURL)
@@ -449,4 +462,7 @@ class DirectoryViewModel: ObservableObject {
 
         return true
     }
+
+    // MARK: - Directory Watching
+    // (All logic now handled by DirectoryWatcherService)
 }
