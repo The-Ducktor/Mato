@@ -98,4 +98,39 @@ class FileManagerService {
         
         return success
     }
+
+    func getDirectoryItem(for url: URL) throws -> DirectoryItem {
+        let resourceValues = try url.resourceValues(forKeys: [
+            .isDirectoryKey,
+            .fileSizeKey,
+            .contentTypeKey,
+            .contentModificationDateKey,
+            .creationDateKey,
+            .isHiddenKey
+        ])
+
+        let isDirectory = resourceValues.isDirectory ?? false
+        let fileName = url.lastPathComponent
+        let fileSize = resourceValues.fileSize ?? 0
+        let fileType = resourceValues.contentType ?? UTType.data
+        let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
+        let creationDate = resourceValues.creationDate ?? Date.distantPast
+        let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
+
+        return DirectoryItem(
+            isDirectory: isDirectory,
+            url: url,
+            name: fileName,
+            size: fileSize,
+            fileType: fileType,
+            lastModified: modificationDate,
+            creationDate: creationDate,
+            isHidden: isHidden
+        )
+    }
+
+    func moveFile(from sourceURL: URL, to destinationURL: URL) throws {
+        let destinationPath = destinationURL.appendingPathComponent(sourceURL.lastPathComponent)
+        try fileManager.moveItem(at: sourceURL, to: destinationPath)
+    }
 }

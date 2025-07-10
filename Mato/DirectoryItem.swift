@@ -7,8 +7,11 @@
 
 import Foundation
 import UniformTypeIdentifiers
+import CoreTransferable
 
-public struct DirectoryItem: Identifiable, Hashable, Sendable {
+public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
+    
+
     public let id = UUID()
     var isDirectory: Bool
     var url: URL
@@ -43,7 +46,13 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable {
     var fileTypeDescription: String {
             return fileType.localizedDescription ?? "Unknown"
         }
-    
-    
-    
+
+    public static var transferRepresentation: some TransferRepresentation {
+        DataRepresentation(contentType: .fileURL) {
+            $0.url.dataRepresentation
+        } importing: { data in
+            let url = URL(dataRepresentation: data, relativeTo: nil)!
+            return try await FileManagerService.shared.getDirectoryItem(for: url)
+        }
+    }
 }

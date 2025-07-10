@@ -20,6 +20,11 @@ class DirectoryViewModel: ObservableObject {
     @Published var pathString: String = ""
     @Published var hideHiddenFiles: Bool = true
 
+    // Rename alert state
+    @Published var showingRenameAlert = false
+    @Published var renameText = ""
+    @Published var itemToRename: DirectoryItem? = nil
+
     private let fileManager = FileManagerService.shared
 
     init() {
@@ -159,5 +164,289 @@ class DirectoryViewModel: ObservableObject {
         formatter.allowedUnits = [.useKB, .useMB, .useGB, .useBytes]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: Int64(size))
+    }
+    
+    // MARK: - Context Menu Actions
+
+    func openSelectedItems(_ ids: Set<DirectoryItem.ID>) {
+        for id in ids {
+            if let item = getItem(id) {
+                openItem(item)
+            }
+        }
+    }
+
+    func openInTerminal(_ ids: Set<DirectoryItem.ID>) {
+        for id in ids {
+            guard let item = getItem(id) else { continue }
+            let targetURL =
+                item.isDirectory
+                ? item.url : item.url.deletingLastPathComponent()
+
+            let script = """
+                    tell application "Terminal"
+                        activate
+                        do script "cd '\(targetURL.path.replacingOccurrences(of: "'", with: "\\'"))'"
+                    end tell
+                """
+
+            if let appleScript = NSAppleScript(source: script) {
+                appleScript.executeAndReturnError(nil)
+            }
+        }
+    }
+
+    func canOpenInTerminal(_ ids: Set<DirectoryItem.ID>) -> Bool {
+        return !ids.isEmpty
+    }
+
+    func startRename(_ id: DirectoryItem.ID) {
+        guard let item = getItem(id) else { return }
+        itemToRename = item
+        renameText = item.name
+        showingRenameAlert = true
+    }
+
+    func performRename() {
+        guard let item = itemToRename else { return }
+
+        let newURL = item.url.deletingLastPathComponent()
+            .appendingPathComponent(renameText)
+
+        do {
+            try FileManager.default.moveItem(at: item.url, to: newURL)
+            refreshCurrentDirectory()
+        } catch {
+            print("Failed to rename: \(error)")
+        }
+
+        itemToRename = nil
+        renameText = ""
+    }
+
+    func copyItems(_ ids: Set<DirectoryItem.ID>) {
+        let urls = getURLs(from: ids)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects(urls as [NSPasteboardWriting])
+    }
+
+    func cutItems(_ ids: Set<DirectoryItem.ID>) {
+        let urls = getURLs(from: ids)
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects(urls as [NSPasteboardWriting])
+
+        pasteboard.setData(
+            Data(),
+            forType: NSPasteboard.PasteboardType(
+                "com.apple.pasteboard.promised-file-url"
+            )
+        )
+    }
+
+    func pasteItems() {
+        guard let currentDir = currentDirectory else { return }
+
+        let pasteboard = NSPasteboard.general
+        guard
+            let urls = pasteboard.readObjects(forClasses: [NSURL.self])
+                as? [URL]
+        else { return }
+
+        for url in urls {
+            let destinationURL = currentDir.appendingPathComponent(
+                url.lastPathComponent
+            )
+
+            do {
+                try FileManager.default.copyItem(at: url, to: destinationURL)
+            } catch {
+                print("Failed to paste: \(error)")
+            }
+        }
+
+        refreshCurrentDirectory()
+    }
+
+    func hasItemsInPasteboard() -> Bool {
+        let pasteboard = NSPasteboard.general
+        return pasteboard.canReadObject(forClasses: [NSURL.self], options: nil)
+    }
+
+    func copyPaths(_ ids: Set<DirectoryItem.ID>) {
+        let paths = ids.compactMap { id in
+            getItem(id)?.url.path
+        }.joined(separator: "\n")
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(paths, forType: .string)
+    }
+
+    func copyAsPathname(_ ids: Set<DirectoryItem.ID>) {
+        let paths = ids.compactMap { id in
+            getItem(id)?.url.standardizedFileURL.path
+        }.joined(separator: "\n")
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(paths, forType: .string)
+    }
+
+    func copyAlias(_ id: DirectoryItem.ID) {
+        guard let item = getItem(id) else { return }
+
+        do {
+            let aliasData = try item.url.bookmarkData(
+                options: .suitableForBookmarkFile,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setData(
+                aliasData,
+                forType: NSPasteboard.PasteboardType("com.apple.alias-file")
+            )
+        } catch {
+            print("Failed to create alias: \(error)")
+        }
+    }
+
+    
+
+    func showInFinder(_ ids: Set<DirectoryItem.ID>) {
+        let urls = getURLs(from: ids)
+        NSWorkspace.shared.activateFileViewerSelecting(urls)
+    }
+
+    func showPackageContents(_ item: DirectoryItem) {
+        if item.isDirectory
+            || item.url.pathExtension.lowercased().contains("app")
+        {
+            NSWorkspace.shared.selectFile(
+                nil,
+                inFileViewerRootedAtPath: item.url.path
+            )
+        }
+    }
+
+    func canCompress(_ ids: Set<DirectoryItem.ID>) -> Bool {
+        return !ids.isEmpty
+    }
+
+    func getCompressionName(_ ids: Set<DirectoryItem.ID>) -> String {
+        if ids.count == 1, let item = getItem(ids.first!) {
+            return item.name
+        }
+        return "\(ids.count) items"
+    }
+
+    func compressItems(_ ids: Set<DirectoryItem.ID>) {
+        let urls = getURLs(from: ids)
+
+        let task = Process()
+        task.launchPath = "/usr/bin/ditto"
+        task.arguments =
+            ["-c", "-k", "--sequesterRsrc", "--keepParent"] + urls.map(\.path)
+            + ["Archive.zip"]
+        task.currentDirectoryPath =
+            currentDirectory?.path
+            ?? FileManager.default.currentDirectoryPath
+
+        do {
+            try task.run()
+            task.waitUntilExit()
+            refreshCurrentDirectory()
+        } catch {
+            print("Failed to compress: \(error)")
+        }
+    }
+
+    func canCreateAlias(_ ids: Set<DirectoryItem.ID>) -> Bool {
+        return !ids.isEmpty
+    }
+
+    func makeAlias(_ ids: Set<DirectoryItem.ID>) {
+        for id in ids {
+            guard let item = getItem(id) else { continue }
+
+            let aliasURL = item.url.appendingPathExtension("alias")
+
+            do {
+                let aliasData = try item.url.bookmarkData(
+                    options: .suitableForBookmarkFile,
+                    includingResourceValuesForKeys: nil,
+                    relativeTo: nil
+                )
+                try aliasData.write(to: aliasURL)
+            } catch {
+                print("Failed to create alias: \(error)")
+            }
+        }
+
+        refreshCurrentDirectory()
+    }
+
+    func moveToTrash(_ ids: Set<DirectoryItem.ID>) {
+        let urls = getURLs(from: ids)
+
+        for url in urls {
+            do {
+                try FileManager.default.trashItem(
+                    at: url,
+                    resultingItemURL: nil
+                )
+            } catch {
+                print("Failed to move to trash: \(error)")
+            }
+        }
+
+        refreshCurrentDirectory()
+    }
+
+    func showServices(_ ids: Set<DirectoryItem.ID>) {
+        _ = getURLs(from: ids)
+    }
+
+    // MARK: - Helper Methods
+
+    func getItem(_ id: DirectoryItem.ID) -> DirectoryItem? {
+        return items.first { $0.id == id }
+    }
+
+    func getURLs(from ids: Set<DirectoryItem.ID>) -> [URL] {
+        return ids.compactMap { id in
+            getItem(id)?.url
+        }
+    }
+
+    func moveFile(from sourceURL: URL, to destinationURL: URL) {
+        Task {
+            do {
+                try fileManager.moveFile(from: sourceURL, to: destinationURL)
+                refreshCurrentDirectory()
+            } catch {
+                errorMessage = "Error moving file: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    func handleDrop(info: DropInfo) -> Bool {
+        guard let itemProvider = info.itemProviders(for: [.fileURL]).first else {
+            return false
+        }
+
+        itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { [weak self] (data, error) in
+            guard let self = self, let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) else {
+                return
+            }
+            
+            Task { @MainActor in
+                if let destinationURL = self.currentDirectory {
+                    self.moveFile(from: url, to: destinationURL)
+                }
+            }
+        }
+
+        return true
     }
 }
