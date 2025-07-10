@@ -435,7 +435,8 @@ class DirectoryViewModel: ObservableObject {
     func moveFile(from sourceURL: URL, to destinationURL: URL) {
         Task {
             do {
-                try fileManager.moveFile(from: sourceURL, to: destinationURL)
+                let finalDestinationURL = destinationURL.appendingPathComponent(sourceURL.lastPathComponent)
+                try fileManager.moveFile(from: sourceURL, to: finalDestinationURL)
                 refreshCurrentDirectory()
             } catch {
                 errorMessage = "Error moving file: \(error.localizedDescription)"
@@ -447,7 +448,8 @@ class DirectoryViewModel: ObservableObject {
         Task {
             do {
                 for sourceURL in sourceURLs {
-                    try fileManager.moveFile(from: sourceURL, to: destinationURL)
+                    let finalDestinationURL = destinationURL.appendingPathComponent(sourceURL.lastPathComponent)
+                    try fileManager.moveFile(from: sourceURL, to: finalDestinationURL)
                 }
                 refreshCurrentDirectory()
             } catch {

@@ -310,8 +310,6 @@ class PaneManager: ObservableObject {
             layout = .single
         } else if panes.count == 2 && (layout == .triple || layout == .quad) {
             layout = .dual
-        } else if panes.count == 3 && layout == .quad {
-            layout = .triple
         }
     }
 
