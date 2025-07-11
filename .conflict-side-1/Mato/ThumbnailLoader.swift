@@ -2,7 +2,8 @@ import Foundation
 @preconcurrency import QuickLookThumbnailing
 import AppKit
 
-final class SimpleThumbnailLoader: ObservableObject, @unchecked Sendable {
+@MainActor
+final class SimpleThumbnailLoader: ObservableObject {
     
     // MARK: - Types
     
@@ -34,7 +35,6 @@ final class SimpleThumbnailLoader: ObservableObject, @unchecked Sendable {
     
     // MARK: - Properties
     
-    // NSCache is thread-safe, so we can use @unchecked Sendable
     private let thumbnailGenerator = QLThumbnailGenerator.shared
     private let imageCache = NSCache<NSURL, NSImage>()
     
@@ -76,36 +76,39 @@ final class SimpleThumbnailLoader: ObservableObject, @unchecked Sendable {
                 fileAt: url,
                 size: options.size,
                 scale: options.scale,
-                representationTypes: .lowQualityThumbnail
+                representationTypes: .all
             )
             
             thumbnailGenerator.generateBestRepresentation(for: request) { representation, error in
-                // Process on background thread
-                if let cgImage = representation?.cgImage {
-                    let imageWidth = CGFloat(cgImage.width)
-                    let imageHeight = CGFloat(cgImage.height)
-                    
-                    // Calculate the final size to fit within bounds while maintaining aspect ratio
-                    let finalSize: CGSize
-                    if options.maintainAspectRatio {
-                        let aspectRatio = imageWidth / imageHeight
-                        let targetAspectRatio = options.size.width / options.size.height
-                        
-                        if aspectRatio > targetAspectRatio {
-                            // Image is wider - fit to width
-                            finalSize = CGSize(width: options.size.width, height: options.size.width / aspectRatio)
+                // Extract Sendable data off-actor to avoid sending non-Sendable representation across actors
+                let cgImage = representation?.cgImage
+                let imageWidth = cgImage.map { CGFloat($0.width) }
+                let imageHeight = cgImage.map { CGFloat($0.height) }
+
+                Task { @MainActor in
+                    if let cgImage, let imageWidth, let imageHeight {
+                        // Calculate the final size to fit within bounds while maintaining aspect ratio
+                        let finalSize: CGSize
+                        if options.maintainAspectRatio {
+                            let aspectRatio = imageWidth / imageHeight
+                            let targetAspectRatio = options.size.width / options.size.height
+                            
+                            if aspectRatio > targetAspectRatio {
+                                // Image is wider - fit to width
+                                finalSize = CGSize(width: options.size.width, height: options.size.width / aspectRatio)
+                            } else {
+                                // Image is taller - fit to height
+                                finalSize = CGSize(width: options.size.height * aspectRatio, height: options.size.height)
+                            }
                         } else {
-                            // Image is taller - fit to height
-                            finalSize = CGSize(width: options.size.height * aspectRatio, height: options.size.height)
+                            finalSize = CGSize(width: imageWidth, height: imageHeight)
                         }
+                        
+                        let nsImage = NSImage(cgImage: cgImage, size: finalSize)
+                        continuation.resume(returning: nsImage)
                     } else {
-                        finalSize = CGSize(width: imageWidth, height: imageHeight)
+                        continuation.resume(throwing: error ?? ThumbnailError.thumbnailGenerationFailed)
                     }
-                    
-                    let nsImage = NSImage(cgImage: cgImage, size: finalSize)
-                    continuation.resume(returning: nsImage)
-                } else {
-                    continuation.resume(throwing: error ?? ThumbnailError.thumbnailGenerationFailed)
                 }
             }
         }

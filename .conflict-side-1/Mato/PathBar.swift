@@ -356,43 +356,11 @@ struct PathBar: View {
         }
     }
     
-    /// Sanitizes a path string by removing quotes, escape characters, and other formatting
-    /// that might be present when pasting from Finder, terminals, or other sources
-    private func sanitizePath(_ path: String) -> String {
-        var sanitized = path.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        // Remove surrounding single quotes
-        if sanitized.hasPrefix("'") && sanitized.hasSuffix("'") && sanitized.count > 2 {
-            sanitized = String(sanitized.dropFirst().dropLast())
-        }
-        
-        // Remove surrounding double quotes
-        if sanitized.hasPrefix("\"") && sanitized.hasSuffix("\"") && sanitized.count > 2 {
-            sanitized = String(sanitized.dropFirst().dropLast())
-        }
-        
-        // Remove escape characters (backslashes before spaces and special chars)
-        sanitized = sanitized.replacingOccurrences(of: "\\ ", with: " ")
-        sanitized = sanitized.replacingOccurrences(of: "\\(", with: "(")
-        sanitized = sanitized.replacingOccurrences(of: "\\)", with: ")")
-        sanitized = sanitized.replacingOccurrences(of: "\\[", with: "[")
-        sanitized = sanitized.replacingOccurrences(of: "\\]", with: "]")
-        sanitized = sanitized.replacingOccurrences(of: "\\{", with: "{")
-        sanitized = sanitized.replacingOccurrences(of: "\\}", with: "}")
-        sanitized = sanitized.replacingOccurrences(of: "\\&", with: "&")
-        sanitized = sanitized.replacingOccurrences(of: "\\;", with: ";")
-        sanitized = sanitized.replacingOccurrences(of: "\\'", with: "'")
-        sanitized = sanitized.replacingOccurrences(of: "\\\"", with: "\"")
-        
-        return sanitized
-    }
-    
     private func commitEdit() {
-        // Sanitize the path to handle quotes and escape characters from Finder/terminal
-        let sanitizedPath = sanitizePath(pathString)
+        let trimmedPath = pathString.trimmingCharacters(in: .whitespacesAndNewlines)
         
         // Expand tilde to home directory
-        let expandedPath = NSString(string: sanitizedPath).expandingTildeInPath
+        let expandedPath = NSString(string: trimmedPath).expandingTildeInPath
         
         withAnimation(.easeInOut(duration: 0.2)) {
             isEditing = false
