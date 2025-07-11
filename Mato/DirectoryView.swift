@@ -15,7 +15,7 @@ struct DirectoryView: View {
     @State private var itemToRename: DirectoryItem?
 
     @State private var sortOrder = [
-        KeyPathComparator(\DirectoryItem.lastModified, order: .reverse)
+        KeyPathComparator(\DirectoryItem.creationDate, order: .reverse)
     ]
 
     init(
