@@ -31,7 +31,11 @@ class DirectoryViewModel: ObservableObject {
     private var directoryWatcherService: DirectoryWatcherService?
 
     init() {
-        loadDownloadsDirectory()
+        // Use default folder from settings
+        let defaultURL = SettingsModel.shared.defaultFolderURL
+        currentDirectory = defaultURL
+        navigationStack = [defaultURL]
+        loadDirectory(at: defaultURL)
     }
 
     func loadDownloadsDirectory() {
