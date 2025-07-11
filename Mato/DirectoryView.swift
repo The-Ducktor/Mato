@@ -14,10 +14,18 @@ struct DirectoryView: View {
     @State private var renameText = ""
     @State private var itemToRename: DirectoryItem?
 
+<<<<<<< ours
     @State private var sortOrder: [KeyPathComparator<DirectoryItem>] =
         SettingsModel.keyPathComparator(
             for: SettingsModel.shared.defaultSortMethod
         )
+||||||| ancestor
+    @State private var sortOrder = [
+        KeyPathComparator(\DirectoryItem.creationDate, order: .reverse)
+    ]
+=======
+    @State private var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod)
+>>>>>>> theirs
 
     init(
         viewModel: DirectoryViewModel = DirectoryViewModel(),
@@ -62,6 +70,7 @@ struct DirectoryView: View {
                         applySorting(with: newSortOrder)
                     }
                     .onAppear {
+<<<<<<< ours
                         sortOrder = SettingsModel.keyPathComparator(
                             for: SettingsModel.shared.defaultSortMethod
                         )
@@ -73,6 +82,14 @@ struct DirectoryView: View {
                         sortOrder = SettingsModel.keyPathComparator(
                             for: newMethod
                         )
+||||||| ancestor
+=======
+                        sortOrder = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod)
+                        applySorting(with: sortOrder)
+                    }
+                    .onChange(of: SettingsModel.shared.defaultSortMethod) { _, newMethod in
+                        sortOrder = SettingsModel.keyPathComparator(for: newMethod)
+>>>>>>> theirs
                         applySorting(with: sortOrder)
                     }
                     .onChange(of: viewModel.currentDirectory) { _, _ in
