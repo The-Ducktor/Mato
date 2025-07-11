@@ -14,8 +14,6 @@ struct ContentView: View {
     @StateObject private var paneManager = PaneManager()
     @StateObject private var settings = SettingsModel.shared
 
-    @StateObject private var settings = SettingsModel.shared
-
     var body: some View {
         NavigationSplitView {
             SidebarView(
@@ -42,34 +40,14 @@ struct ContentView: View {
                     }
 
                     ToolbarItemGroup(placement: .primaryAction) {
+                        ViewModeToggle()
                         LayoutMenu(paneManager: paneManager)
                         PaneControls(paneManager: paneManager)
                     }
                 }
         }
         .onAppear {
-<<<<<<< ours
             initializePanes()
-||||||| ancestor
-            // Initialize with dual pane layout
-            if paneManager.panes.isEmpty {
-                paneManager.addPane() // First pane
-                paneManager.addPane() // Second pane
-                paneManager.setLayout(.dual)
-                paneManager.setActivePane(index: 0)
-            }
-=======
-            // Initialize panes and folder from settings
-            if paneManager.panes.isEmpty {
-                for _ in 0..<settings.defaultPaneCount {
-                    paneManager.addPane()
-                }
-                paneManager.setLayout(settings.defaultPaneCount == 1 ? .single : settings.defaultPaneCount == 2 ? .dual : settings.defaultPaneCount == 3 ? .triple : .quad)
-                paneManager.setActivePane(index: 0)
-                let defaultURL = URL(fileURLWithPath: settings.defaultFolder)
-                paneManager.panes.forEach { $0.loadDirectory(at: defaultURL) }
-            }
->>>>>>> theirs
         }
     }
     

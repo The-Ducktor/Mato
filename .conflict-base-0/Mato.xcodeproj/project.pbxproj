@@ -414,6 +414,8 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
@@ -429,6 +431,16 @@
 				CURRENT_PROJECT_VERSION = 17;
 =======
 				CURRENT_PROJECT_VERSION = 18;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 18;
+=======
+				CURRENT_PROJECT_VERSION = 44;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 44;
+=======
+				CURRENT_PROJECT_VERSION = 49;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -463,6 +475,8 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
@@ -478,6 +492,16 @@
 				CURRENT_PROJECT_VERSION = 17;
 =======
 				CURRENT_PROJECT_VERSION = 18;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 18;
+=======
+				CURRENT_PROJECT_VERSION = 44;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 44;
+=======
+				CURRENT_PROJECT_VERSION = 49;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -508,6 +532,8 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
@@ -523,6 +549,16 @@
 				CURRENT_PROJECT_VERSION = 17;
 =======
 				CURRENT_PROJECT_VERSION = 18;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 18;
+=======
+				CURRENT_PROJECT_VERSION = 44;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 44;
+=======
+				CURRENT_PROJECT_VERSION = 49;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -545,6 +581,8 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
@@ -560,6 +598,16 @@
 				CURRENT_PROJECT_VERSION = 17;
 =======
 				CURRENT_PROJECT_VERSION = 18;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 18;
+=======
+				CURRENT_PROJECT_VERSION = 44;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 44;
+=======
+				CURRENT_PROJECT_VERSION = 49;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -581,6 +629,8 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
@@ -596,6 +646,16 @@
 				CURRENT_PROJECT_VERSION = 17;
 =======
 				CURRENT_PROJECT_VERSION = 18;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 18;
+=======
+				CURRENT_PROJECT_VERSION = 44;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 44;
+=======
+				CURRENT_PROJECT_VERSION = 49;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -616,6 +676,8 @@
 <<<<<<< ours
 <<<<<<< ours
 <<<<<<< ours
+<<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
@@ -631,6 +693,16 @@
 				CURRENT_PROJECT_VERSION = 17;
 =======
 				CURRENT_PROJECT_VERSION = 18;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 18;
+=======
+				CURRENT_PROJECT_VERSION = 44;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 44;
+=======
+				CURRENT_PROJECT_VERSION = 49;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;

@@ -1,4 +1,3 @@
-
 //  PaneAreaView.swift
 //  Mato
 //
@@ -83,25 +82,90 @@ struct PaneAreaView: View {
     }
 }
 
+// MARK: - Draggable Pane Wrapper
+struct DraggablePane: View {
+    let paneIndex: Int
+    @ObservedObject var paneManager: PaneManager
+    @Binding var draggedPaneIndex: Int?
+    @State private var isDropTarget = false
+    @State private var isDragging = false
+    
+    var body: some View {
+        Group {
+            if paneIndex < paneManager.panes.count {
+                FileManagerPane(
+                    viewModel: paneManager.panes[paneIndex],
+                    isActive: paneManager.activePaneIndex == paneIndex,
+                    onActivate: { paneManager.setActivePane(index: paneIndex) }
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    paneManager.setActivePane(index: paneIndex)
+                }
+                .draggable("\(paneIndex)") {
+                    // Custom drag preview
+                    Text("Pane \(paneIndex + 1)")
+                        .padding()
+                        .background(Color.accentColor.opacity(0.8))
+                        .cornerRadius(8)
+                        .onAppear {
+                            draggedPaneIndex = paneIndex
+                            isDragging = true
+                        }
+                }
+                .dropDestination(for: String.self) { items, location in
+                    guard let draggedIndexString = items.first,
+                          let draggedIndex = Int(draggedIndexString),
+                          draggedIndex != paneIndex,
+                          draggedIndex < paneManager.panes.count,
+                          paneIndex < paneManager.panes.count else {
+                        draggedPaneIndex = nil
+                        isDragging = false
+                        return false
+                    }
+                    
+                    paneManager.swapPanes(from: draggedIndex, to: paneIndex)
+                    draggedPaneIndex = nil
+                    isDragging = false
+                    return true
+                } isTargeted: { targeted in
+                    isDropTarget = targeted
+                }
+                .opacity(draggedPaneIndex == paneIndex ? 0.5 : 1.0)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isDropTarget && draggedPaneIndex != paneIndex ? Color.accentColor : Color.clear, lineWidth: 3)
+                        .padding(2)
+                )
+                .onChange(of: isDragging) { oldValue, newValue in
+                    if !newValue {
+                        // Small delay to ensure drop completes first
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            draggedPaneIndex = nil
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Resizable Dual Pane View
 struct ResizableDualPaneView: View {
     @ObservedObject var paneManager: PaneManager
     @Binding var splitPosition: Double
+    @State private var draggedPaneIndex: Int?
     
     var body: some View {
         GeometryReader { geometry in
             HStack(spacing: 0) {
                 if paneManager.panes.count >= 1 {
-                    FileManagerPane(
-                        viewModel: paneManager.panes[0],
-                        isActive: paneManager.activePaneIndex == 0,
-                        onActivate: { paneManager.setActivePane(index: 0) }
+                    DraggablePane(
+                        paneIndex: 0,
+                        paneManager: paneManager,
+                        draggedPaneIndex: $draggedPaneIndex
                     )
                     .frame(width: geometry.size.width * splitPosition)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        paneManager.setActivePane(index: 0)
-                    }
                 }
                 
                 if paneManager.panes.count >= 2 {
@@ -113,16 +177,12 @@ struct ResizableDualPaneView: View {
                         splitPosition = max(0.15, min(0.85, splitPosition + deltaRatio))
                     }
                     
-                    FileManagerPane(
-                        viewModel: paneManager.panes[1],
-                        isActive: paneManager.activePaneIndex == 1,
-                        onActivate: { paneManager.setActivePane(index: 1) }
+                    DraggablePane(
+                        paneIndex: 1,
+                        paneManager: paneManager,
+                        draggedPaneIndex: $draggedPaneIndex
                     )
                     .frame(width: geometry.size.width * (1 - splitPosition))
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        paneManager.setActivePane(index: 1)
-                    }
                 }
             }
         }
@@ -134,6 +194,7 @@ struct ResizableTriplePaneView: View {
     @ObservedObject var paneManager: PaneManager
     @Binding var firstSplit: Double
     @Binding var secondSplit: Double
+    @State private var draggedPaneIndex: Int?
     
     var body: some View {
         GeometryReader { geometry in
@@ -154,16 +215,12 @@ struct ResizableTriplePaneView: View {
                         }
                     }
                     
-                    FileManagerPane(
-                        viewModel: paneManager.panes[index],
-                        isActive: paneManager.activePaneIndex == index,
-                        onActivate: { paneManager.setActivePane(index: index) }
+                    DraggablePane(
+                        paneIndex: index,
+                        paneManager: paneManager,
+                        draggedPaneIndex: $draggedPaneIndex
                     )
                     .frame(width: paneWidth(for: index, in: geometry.size.width))
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        paneManager.setActivePane(index: index)
-                    }
                 }
             }
         }
@@ -189,6 +246,7 @@ struct ResizableQuadPaneView: View {
     @Binding var verticalSplit: Double
     @Binding var topLeftWidth: Double
     @Binding var bottomLeftWidth: Double
+    @State private var draggedPaneIndex: Int?
     
     var body: some View {
         GeometryReader { geometry in
@@ -196,16 +254,12 @@ struct ResizableQuadPaneView: View {
                 // Top row
                 HStack(spacing: 0) {
                     if paneManager.panes.count >= 1 {
-                        FileManagerPane(
-                            viewModel: paneManager.panes[0],
-                            isActive: paneManager.activePaneIndex == 0,
-                            onActivate: { paneManager.setActivePane(index: 0) }
+                        DraggablePane(
+                            paneIndex: 0,
+                            paneManager: paneManager,
+                            draggedPaneIndex: $draggedPaneIndex
                         )
                         .frame(width: geometry.size.width * topLeftWidth)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            paneManager.setActivePane(index: 0)
-                        }
                     }
                     
                     if paneManager.panes.count >= 2 {
@@ -216,16 +270,12 @@ struct ResizableQuadPaneView: View {
                             topLeftWidth = max(0.15, min(0.85, topLeftWidth + deltaRatio))
                         }
                         
-                        FileManagerPane(
-                            viewModel: paneManager.panes[1],
-                            isActive: paneManager.activePaneIndex == 1,
-                            onActivate: { paneManager.setActivePane(index: 1) }
+                        DraggablePane(
+                            paneIndex: 1,
+                            paneManager: paneManager,
+                            draggedPaneIndex: $draggedPaneIndex
                         )
                         .frame(width: geometry.size.width * (1 - topLeftWidth))
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            paneManager.setActivePane(index: 1)
-                        }
                     }
                 }
                 .frame(height: geometry.size.height * verticalSplit)
@@ -241,16 +291,12 @@ struct ResizableQuadPaneView: View {
                     
                     // Bottom row
                     HStack(spacing: 0) {
-                        FileManagerPane(
-                            viewModel: paneManager.panes[2],
-                            isActive: paneManager.activePaneIndex == 2,
-                            onActivate: { paneManager.setActivePane(index: 2) }
+                        DraggablePane(
+                            paneIndex: 2,
+                            paneManager: paneManager,
+                            draggedPaneIndex: $draggedPaneIndex
                         )
                         .frame(width: geometry.size.width * bottomLeftWidth)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            paneManager.setActivePane(index: 2)
-                        }
                         
                         if paneManager.panes.count >= 4 {
                             NativeResizeHandle(
@@ -260,16 +306,12 @@ struct ResizableQuadPaneView: View {
                                 bottomLeftWidth = max(0.15, min(0.85, bottomLeftWidth + deltaRatio))
                             }
                             
-                            FileManagerPane(
-                                viewModel: paneManager.panes[3],
-                                isActive: paneManager.activePaneIndex == 3,
-                                onActivate: { paneManager.setActivePane(index: 3) }
+                            DraggablePane(
+                                paneIndex: 3,
+                                paneManager: paneManager,
+                                draggedPaneIndex: $draggedPaneIndex
                             )
                             .frame(width: geometry.size.width * (1 - bottomLeftWidth))
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                paneManager.setActivePane(index: 3)
-                            }
                         }
                     }
                     .frame(height: geometry.size.height * (1 - verticalSplit))
