@@ -411,7 +411,13 @@
 				CODE_SIGN_ENTITLEMENTS = Mato/Mato.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 3;
+=======
+				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -442,7 +448,13 @@
 				CODE_SIGN_ENTITLEMENTS = Mato/Mato.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 3;
+=======
+				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -469,7 +481,13 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 3;
+=======
+				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -488,7 +506,13 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 3;
+=======
+				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -506,7 +530,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 3;
+=======
+				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -523,7 +553,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 3;
+=======
+				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				GENERATE_INFOPLIST_FILE = YES;

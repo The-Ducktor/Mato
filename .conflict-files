@@ -1,3 +1,3 @@
 ancestorEntries = []
-ourEntries = ["Mato.xcodeproj/project.pbxproj", "Mato/ContentView.swift", "Mato/DirectoryView.swift", "Mato/SettingsView.swift"]
-theirEntries = ["Mato.xcodeproj/project.pbxproj", "Mato/ContentView.swift", "Mato/DirectoryView.swift", "Mato/SettingsView.swift"]
+ourEntries = [".gitignore", "Mato.xcodeproj/project.pbxproj"]
+theirEntries = [".gitignore", "Mato.xcodeproj/project.pbxproj"]
