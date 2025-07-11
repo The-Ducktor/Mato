@@ -412,11 +412,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 <<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
 =======
 				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 16;
+=======
+				CURRENT_PROJECT_VERSION = 17;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -449,11 +455,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 <<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
 =======
 				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 16;
+=======
+				CURRENT_PROJECT_VERSION = 17;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -482,11 +494,17 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 <<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
 =======
 				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 16;
+=======
+				CURRENT_PROJECT_VERSION = 17;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -507,11 +525,17 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 <<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
 =======
 				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 16;
+=======
+				CURRENT_PROJECT_VERSION = 17;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -531,11 +555,17 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 <<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
 =======
 				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 16;
+=======
+				CURRENT_PROJECT_VERSION = 17;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
@@ -554,11 +584,17 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 <<<<<<< ours
+<<<<<<< ours
 				CURRENT_PROJECT_VERSION = 55;
 ||||||| ancestor
 				CURRENT_PROJECT_VERSION = 3;
 =======
 				CURRENT_PROJECT_VERSION = 16;
+>>>>>>> theirs
+||||||| ancestor
+				CURRENT_PROJECT_VERSION = 16;
+=======
+				CURRENT_PROJECT_VERSION = 17;
 >>>>>>> theirs
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
