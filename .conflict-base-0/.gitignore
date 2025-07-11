@@ -86,6 +86,7 @@ fastlane/*.env
 
 iOSInjectionProject/
 
+<<<<<<< ours
 .DS_Store
 Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate
 .crush/
@@ -184,4 +185,17 @@ iOSInjectionProject/
 =======
 
 .DS_Store
+>>>>>>> theirs
+||||||| ancestor
+.DS_Store
+=======
+.DS_Store
+Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate
+<<<<<<< ours
+.DS_Store
+>>>>>>> theirs
+||||||| ancestor
+.DS_Store
+=======
+
 >>>>>>> theirs
