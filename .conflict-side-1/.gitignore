@@ -118,6 +118,7 @@ xcuserdata/
 ## We don't want any memgrap's to leak ;)
 **.memgraph
 
+
 ## Obj-C/Swift specific
 *.hmap
 *.ipa
@@ -177,4 +178,10 @@ fastlane/*.env
 # https://github.com/johnno1962/injectionforxcode
 
 iOSInjectionProject/
+<<<<<<< ours
+>>>>>>> theirs
+||||||| ancestor
+=======
+
+.DS_Store
 >>>>>>> theirs
