@@ -40,7 +40,6 @@ struct ContentView: View {
                     }
 
                     ToolbarItemGroup(placement: .primaryAction) {
-                        ViewModeToggle()
                         LayoutMenu(paneManager: paneManager)
                         PaneControls(paneManager: paneManager)
                     }

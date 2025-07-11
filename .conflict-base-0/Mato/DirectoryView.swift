@@ -3,8 +3,6 @@ import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 
-
-
 struct DirectoryView: View {
     @ObservedObject var viewModel: DirectoryViewModel
     var onActivate: (() -> Void)? = nil
@@ -15,7 +13,6 @@ struct DirectoryView: View {
     @State private var showingRenameAlert = false
     @State private var renameText = ""
     @State private var itemToRename: DirectoryItem?
-    @ObservedObject private var settings = SettingsModel.shared
 
     @State private var sortOrder: [KeyPathComparator<DirectoryItem>] =
         SettingsModel.keyPathComparator(
@@ -31,7 +28,7 @@ struct DirectoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        VStack {
             PathBar(
                 path: viewModel.currentDirectory
                     ?? URL(fileURLWithPath: "/Users"),
@@ -41,47 +38,19 @@ struct DirectoryView: View {
             .onTapGesture {
                 onActivate?()
             }
-            
-            // Error banner
-            if let error = viewModel.errorMessage {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.primary)
-                    Spacer()
-                    Button(action: {
-                        viewModel.errorMessage = nil
-                    }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.orange.opacity(0.15))
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
 
             ZStack {
-                Group {
-                    if settings.viewMode == "grid" {
-                            DirectoryGridView(
-                                viewModel: viewModel,
-                                selectedItems: $selectedItems,
-                                sortOrder: $sortOrder,
-                                quickLookAction: openQuickLook
-                            )
-                        } else {
-                            DirectoryTableView(
-                                viewModel: viewModel,
-                                selectedItems: $selectedItems,
-                                sortOrder: $sortOrder
-                            )
-                        }
+                if let error = viewModel.errorMessage {
+                    ErrorView(error: error) {
+                        viewModel.loadDownloadsDirectory()
+                        onActivate?()
                     }
+                } else {
+                    DirectoryTableView(
+                        viewModel: viewModel,
+                        selectedItems: $selectedItems,
+                        sortOrder: $sortOrder
+                    )
                     .modifier(
                         DirectoryContextMenu(
                             viewModel: viewModel,
@@ -90,13 +59,13 @@ struct DirectoryView: View {
                         )
                     )
                     .onChange(of: sortOrder) { _, newSortOrder in
-                        viewModel.setSortOrder(newSortOrder)
+                        applySorting(with: newSortOrder)
                     }
                     .onAppear {
                         sortOrder = SettingsModel.keyPathComparator(
                             for: SettingsModel.shared.defaultSortMethod
                         )
-                        viewModel.setSortOrder(sortOrder)
+                        applySorting(with: sortOrder)
                     }
                     .onChange(of: SettingsModel.shared.defaultSortMethod) {
                         _,
@@ -104,10 +73,13 @@ struct DirectoryView: View {
                         sortOrder = SettingsModel.keyPathComparator(
                             for: newMethod
                         )
-                        viewModel.setSortOrder(sortOrder)
+                        applySorting(with: sortOrder)
                     }
                     .onChange(of: viewModel.currentDirectory) { _, _ in
-                        // Sorting is handled by the view model
+                        applySorting(with: sortOrder)
+                    }
+                    .onChange(of: viewModel.items) { _, _ in
+                        applySorting(with: sortOrder)
                     }
                     .onChange(of: selectedItems) {
                         onActivate?()
@@ -122,6 +94,7 @@ struct DirectoryView: View {
                         return .handled
                     }
                     .quickLookPreview($quickLookURL, in: selectedItemURLs)
+                }
 
                 if viewModel.isLoading {
                     LoadingView()
@@ -142,23 +115,13 @@ struct DirectoryView: View {
         } message: {
             Text("Enter a new name for the item")
         }
-        .alert("Replace Files?", isPresented: $viewModel.showingFileConflictAlert) {
-            Button("Cancel", role: .cancel) {
-                viewModel.cancelReplaceFiles()
-            }
-            Button("Replace") {
-                viewModel.confirmReplaceFiles()
-            }
-        } message: {
-            Text(viewModel.conflictMessage)
-        }
     }
 
     // MARK: - Drag and Drop
 
     private func dragProvider() -> NSItemProvider {
         let selectedURLs = selectedItems.compactMap { id in
-            viewModel.sortedItems.first { $0.id == id }?.url
+            viewModel.items.first { $0.id == id }?.url
         }
 
         guard !selectedURLs.isEmpty else { return NSItemProvider() }
@@ -185,11 +148,18 @@ struct DirectoryView: View {
     }
 
     // MARK: - Sorting Helper
-    // Sorting is now handled by DirectoryViewModel
+
+    private func applySorting(
+        with sortOrder: [KeyPathComparator<DirectoryItem>]
+    ) {
+        DispatchQueue.main.async {
+            viewModel.items.sort(using: sortOrder)
+        }
+    }
 
     private var selectedItemURLs: [URL] {
         selectedItems.compactMap { id in
-            viewModel.sortedItems.first { $0.id == id }?.url
+            viewModel.items.first { $0.id == id }?.url
         }
     }
 
@@ -197,7 +167,7 @@ struct DirectoryView: View {
 
     private func handleSpaceKeyPress() {
         guard let firstSelectedId = selectedItems.first,
-            let selectedItem = viewModel.sortedItems.first(where: {
+            let selectedItem = viewModel.items.first(where: {
                 $0.id == firstSelectedId
             })
         else {
