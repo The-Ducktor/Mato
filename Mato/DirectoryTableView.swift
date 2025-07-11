@@ -7,16 +7,9 @@ struct DirectoryTableView: View {
     @Binding var sortOrder: [KeyPathComparator<DirectoryItem>]
     @State private var color: Color = .clear // testing
     @State private var isDropTargeted: Bool = false
-    @State private var dropMessage: String = ""
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if !dropMessage.isEmpty {
-                Text(dropMessage)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding([.leading, .top, .trailing])
-            }
             Table(selection: $selectedItems, sortOrder: $sortOrder) {
                 TableColumn("Name", value: \.name) { item in
                     ZStack {
@@ -98,11 +91,10 @@ struct DirectoryTableView: View {
                 ForEach(viewModel.items) { item in
                     TableRow(item)
                         .draggable(item.url)
+                     
                 }
             }
-            .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel, setDropMessage: { message in
-                dropMessage = message
-            }))
+            .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
         }
     }
     private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
