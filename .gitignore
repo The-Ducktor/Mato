@@ -86,3 +86,5 @@ fastlane/*.env
 iOSInjectionProject/
 
 .DS_Store
+Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate
+.DS_Store
