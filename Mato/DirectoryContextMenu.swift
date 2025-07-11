@@ -18,7 +18,9 @@ struct DirectoryContextMenu: ViewModifier {
                     Button("Open in Terminal") {
                         viewModel.openInTerminal(ids)
                     }
-                    .disabled(ids.isEmpty || !viewModel.canOpenInTerminal(ids))
+                    .disabled(
+                        ids.isEmpty || !viewModel
+                            .canOpenInTerminal(ids))
                 }
 
                 Divider()

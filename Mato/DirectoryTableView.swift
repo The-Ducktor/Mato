@@ -58,7 +58,7 @@ struct DirectoryTableView: View {
                             .padding(.horizontal)
                         }
                         
-                        .border(Color.gray) // For debugging layout
+                        //.border(Color.gray) // For debugging layout
 
                 }
                 .width(min: 180)
