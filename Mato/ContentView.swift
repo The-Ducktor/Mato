@@ -16,6 +16,8 @@ struct ContentView: View {
     @StateObject private var paneManager = PaneManager()
     @State private var showingPaneSelector = false
 
+    @StateObject private var settings = SettingsModel.shared
+
     var body: some View {
         NavigationSplitView {
             List {
@@ -200,12 +202,15 @@ struct ContentView: View {
                 }
         }
         .onAppear {
-            // Initialize with dual pane layout
+            // Initialize panes and folder from settings
             if paneManager.panes.isEmpty {
-                paneManager.addPane() // First pane
-                paneManager.addPane() // Second pane
-                paneManager.setLayout(.dual)
+                for _ in 0..<settings.defaultPaneCount {
+                    paneManager.addPane()
+                }
+                paneManager.setLayout(settings.defaultPaneCount == 1 ? .single : settings.defaultPaneCount == 2 ? .dual : settings.defaultPaneCount == 3 ? .triple : .quad)
                 paneManager.setActivePane(index: 0)
+                let defaultURL = URL(fileURLWithPath: settings.defaultFolder)
+                paneManager.panes.forEach { $0.loadDirectory(at: defaultURL) }
             }
         }
     }

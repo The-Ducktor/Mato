@@ -6,17 +6,16 @@
 //
 
 import SwiftUI
-import SwiftData
-
 
 @main
 struct MatoApp: App {
-    
-
     var body: some Scene {
         WindowGroup {
             ContentView()
         }
-       
+
+        Settings {
+            SettingsView()
+        }
     }
 }
