@@ -1,4 +1,5 @@
 <<<<<<< ours
+<<<<<<< ours
 import SwiftUI
 
 struct SettingsView: View {
@@ -56,7 +57,6 @@ struct SettingsView: View {
                             .controlSize(.regular)
                         }
                     }
-                   
                     
                     // Folder Selection Card
                     SettingsCard(
