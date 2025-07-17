@@ -51,7 +51,7 @@ struct DirectoryTableView: View {
                             HStack {
                                 ImageIcon(item: .constant(item))
                                            .frame(width: 16, height: 16)
-                                       Text(item.name)
+                                       Text(item.isAppBundle ? item.url.deletingPathExtension().lastPathComponent : item.name)
                                            .truncationMode(.middle)
                                        Spacer()
                             }

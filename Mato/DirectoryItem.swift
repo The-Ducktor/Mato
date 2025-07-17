@@ -14,6 +14,7 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
 
     public let id = UUID()
     var isDirectory: Bool
+    var isAppBundle: Bool
     var url: URL
     var name: String = "Unknown"
     var size: Int = 0
@@ -24,6 +25,7 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
     
     public init(
         isDirectory: Bool,
+        isAppBundle: Bool,
         url: URL,
         name: String,
         size: Int,
@@ -33,6 +35,7 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
         isHidden: Bool
     ) {
         self.isDirectory = isDirectory
+        self.isAppBundle = isAppBundle
         self.url = url
         self.name = name
         self.size = size

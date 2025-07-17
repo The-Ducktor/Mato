@@ -97,7 +97,7 @@ class DirectoryViewModel: ObservableObject {
     }
 
     func openItem(_ item: DirectoryItem) {
-        if item.isDirectory {
+        if item.isDirectory && !item.isAppBundle {
             // When navigating to a new directory, clear the forward stack
             forwardStack.removeAll()
 

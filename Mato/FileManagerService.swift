@@ -47,10 +47,12 @@ class FileManagerService {
                 let creationDate = resourceValues.creationDate ?? Date.distantPast
                 let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
                 
+                let isAppBundle = url.pathExtension == "app" && isDirectory
                 
                 
                 return DirectoryItem(
                     isDirectory: isDirectory,
+                    isAppBundle: isAppBundle,
                     url: url,
                     name: fileName,
                     size: fileSize,
@@ -109,16 +111,23 @@ class FileManagerService {
             .isHiddenKey
         ])
 
-        let isDirectory = resourceValues.isDirectory ?? false
+        var isDirectory = resourceValues.isDirectory ?? false
         let fileName = url.lastPathComponent
         let fileSize = resourceValues.fileSize ?? 0
-        let fileType = resourceValues.contentType ?? UTType.data
+        var fileType = resourceValues.contentType ?? UTType.data
         let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
         let creationDate = resourceValues.creationDate ?? Date.distantPast
         let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
 
+        let isAppBundle = url.pathExtension == "app"
+        if isAppBundle {
+            isDirectory = false
+            fileType = .application
+        }
+
         return DirectoryItem(
             isDirectory: isDirectory,
+            isAppBundle: isAppBundle,
             url: url,
             name: fileName,
             size: fileSize,
