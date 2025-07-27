@@ -94,6 +94,21 @@ struct DirectoryTableView: View {
                 .width(min: 150)
                 .alignment(.trailing)
                 .customizationID("dateCreated")
+                TableColumn("Date Added", value: \.addedDate) { item in
+                    Text(formatDate(item.addedDate))
+                }
+                .width(min: 150)
+                .alignment(.trailing)
+                .customizationID("dateAdded")
+                TableColumn(
+                    "Last Acsessed ",
+                    value: \.dateLastAccessed
+                ) { item in
+                    Text(formatDate(item.dateLastAccessed))
+                }
+                .width(min: 150)
+                .alignment(.trailing)
+                .customizationID("dateAdded")
             } rows: {
                 ForEach(viewModel.items) { item in
                     TableRow(item)

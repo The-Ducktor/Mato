@@ -36,36 +36,19 @@ class FileManagerService {
                     .fileSizeKey,
                     .contentTypeKey,
                     .contentModificationDateKey,
-                    .creationDateKey
+                    .creationDateKey,
+                    .isHiddenKey,
+                    .addedToDirectoryDateKey,
+                    .isApplicationKey,
+                    .nameKey
                 ])
-                
-                let isDirectory = resourceValues.isDirectory ?? false
-                let fileName = url.lastPathComponent
-                let fileSize = resourceValues.fileSize ?? 0
-                let fileType = resourceValues.contentType ?? UTType.data
-                let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
-                let creationDate = resourceValues.creationDate ?? Date.distantPast
-                let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
-                
-                let isAppBundle = url.pathExtension == "app" && isDirectory
-                
-                
-                return DirectoryItem(
-                    isDirectory: isDirectory,
-                    isAppBundle: isAppBundle,
-                    url: url,
-                    name: fileName,
-                    size: fileSize,
-                    fileType: fileType,
-                    lastModified: modificationDate,
-                    creationDate: creationDate,
-                    isHidden: isHidden
-                )
+                return makeDirectoryItem(from: url, with: resourceValues)
             } catch {
                 print("Error getting attributes for \(url): \(error)")
                 return nil
             }
         }
+
     }
     
     func openFile(at url: URL) {
@@ -102,24 +85,37 @@ class FileManagerService {
     }
 
     func getDirectoryItem(for url: URL) throws -> DirectoryItem {
+       
         let resourceValues = try url.resourceValues(forKeys: [
             .isDirectoryKey,
             .fileSizeKey,
             .contentTypeKey,
             .contentModificationDateKey,
             .creationDateKey,
-            .isHiddenKey
+            .isHiddenKey,
+            .addedToDirectoryDateKey,
+            .isApplicationKey,
+            .nameKey
         ])
+        return makeDirectoryItem(from: url, with: resourceValues)
 
+    }
+
+    func moveFile(from sourceURL: URL, to destinationURL: URL) throws {
+        let destinationPath = destinationURL.appendingPathComponent(sourceURL.lastPathComponent)
+        try fileManager.moveItem(at: sourceURL, to: destinationPath)
+    }
+    private func makeDirectoryItem(from url: URL, with resourceValues: URLResourceValues) -> DirectoryItem {
         var isDirectory = resourceValues.isDirectory ?? false
-        let fileName = url.lastPathComponent
-        let fileSize = resourceValues.fileSize ?? 0
         var fileType = resourceValues.contentType ?? UTType.data
+        let fileName = resourceValues.name ?? url.lastPathComponent
+        let fileSize = resourceValues.fileSize ?? 0
         let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
         let creationDate = resourceValues.creationDate ?? Date.distantPast
+        let addedDate = resourceValues.addedToDirectoryDate ?? creationDate
         let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
+        let isAppBundle = (resourceValues.isApplication ?? false) || url.pathExtension == "app"
 
-        let isAppBundle = url.pathExtension == "app"
         if isAppBundle {
             isDirectory = false
             fileType = .application
@@ -134,12 +130,9 @@ class FileManagerService {
             fileType: fileType,
             lastModified: modificationDate,
             creationDate: creationDate,
+            dateAdded: addedDate,
             isHidden: isHidden
         )
     }
 
-    func moveFile(from sourceURL: URL, to destinationURL: URL) throws {
-        let destinationPath = destinationURL.appendingPathComponent(sourceURL.lastPathComponent)
-        try fileManager.moveItem(at: sourceURL, to: destinationPath)
-    }
 }

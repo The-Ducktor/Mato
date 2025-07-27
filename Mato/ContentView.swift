@@ -153,26 +153,49 @@ struct ContentView: View {
                     ToolbarItemGroup(placement: .primaryAction) {
                         // Layout selector
                         Menu {
-                            Button("Single Pane") {
+                            Button {
                                 paneManager.setLayout(.single)
+                            } label: {
+                                HStack {
+                                    Text("Single Pane")
+                                    Image(systemName: "rectangle")
+                                    
+                                }
+                              
+                             
                             }
 
-                            Button("Dual Pane") {
+                            Button {
                                 paneManager.setLayout(.dual)
                                 if paneManager.panes.count < 2 {
                                     paneManager.addPane()
                                 }
+                            } label: {
+                                HStack {
+                                    Text("Dual Pane")
+                                    Image(systemName: "rectangle.split.2x1")
+                                }
                             }
 
                             if paneManager.panes.count >= 3 {
-                                Button("Triple Pane") {
+                                Button {
                                     paneManager.setLayout(.triple)
+                                } label: {
+                                    HStack {
+                                        Text("Triple Pane")
+                                        Image(systemName: "rectangle.split.3x1")
+                                    }
                                 }
                             }
 
                             if paneManager.panes.count >= 4 {
-                                Button("Quad Pane") {
+                                Button {
                                     paneManager.setLayout(.quad)
+                                } label: {
+                                    HStack {
+                                        Text("Quad Pane")
+                                        Image(systemName: "rectangle.split.2x2")
+                                    }
                                 }
                             }
                         } label: {
