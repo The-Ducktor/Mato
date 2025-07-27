@@ -7,10 +7,16 @@ struct DirectoryTableView: View {
     @Binding var sortOrder: [KeyPathComparator<DirectoryItem>]
     @State private var color: Color = .clear // testing
     @State private var isDropTargeted: Bool = false
+    @SceneStorage("DirectoryTableViewConfig")
+    private var columnCustomization: TableColumnCustomization<DirectoryItem>
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Table(selection: $selectedItems, sortOrder: $sortOrder) {
+            Table(
+                selection: $selectedItems,
+                sortOrder: $sortOrder,
+                columnCustomization: $columnCustomization,
+            ) {
                 TableColumn("Name", value: \.name) { item in
                     ZStack {
                         Rectangle()
@@ -62,7 +68,7 @@ struct DirectoryTableView: View {
 
                 }
                 .width(min: 180)
-                .alignment(.leading)
+                .alignment(.leading).customizationID("name")
 
                 TableColumn("Size", value: \.size) { item in
                     if item.isDirectory {
@@ -72,7 +78,7 @@ struct DirectoryTableView: View {
                     }
                 }
                 .width(min: 100)
-                .alignment(.trailing)
+                .alignment(.trailing).customizationID("size")
 
                 TableColumn("Kind", value: \.fileTypeDescription) { item in
                     Text(item.fileTypeDescription)
@@ -81,12 +87,13 @@ struct DirectoryTableView: View {
 
                 TableColumn("Date Modified", value: \.lastModified) { item in
                     Text(formatDate(item.lastModified))
-                }
+                }.customizationID("dateModified")
                 TableColumn("Date Created", value: \.creationDate) { item in
                     Text(formatDate(item.creationDate))
                 }
                 .width(min: 150)
                 .alignment(.trailing)
+                .customizationID("dateCreated")
             } rows: {
                 ForEach(viewModel.items) { item in
                     TableRow(item)

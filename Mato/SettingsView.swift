@@ -161,7 +161,7 @@ struct SettingsView: View {
                                         .font(.system(size: 11))
                                         .foregroundColor(.secondary)
                                         .lineLimit(2)
-                                        .frame(width: 180, alignment: .leading)
+                                        .frame(width: 180, height: 50, alignment: .leading) // set explict size for info text
                                 }
                                 
                                 Spacer()
