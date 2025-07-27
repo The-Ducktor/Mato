@@ -19,6 +19,7 @@ final class FileManagerService: @unchecked Sendable {
         return fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first
     }
     
+<<<<<<< ours
     func getContents(of directory: URL) async throws -> [DirectoryItem] {
         return try await Task.detached(priority: .userInitiated) { [self, fileManager] in
             let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [
@@ -47,6 +48,95 @@ final class FileManagerService: @unchecked Sendable {
                     print("Error getting attributes for \(url): \(error)")
                     return nil
                 }
+||||||| ancestor
+    func getContents(of directory: URL) throws -> [DirectoryItem] {
+        let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [
+            .isDirectoryKey,
+            .fileSizeKey,
+            .contentTypeKey,
+            .contentModificationDateKey,
+            .creationDateKey
+        ])
+        
+        return contents.compactMap { url in
+            do {
+                let resourceValues = try url.resourceValues(forKeys: [
+                    .isDirectoryKey,
+                    .fileSizeKey,
+                    .contentTypeKey,
+                    .contentModificationDateKey,
+                    .creationDateKey
+                ])
+                
+                let isDirectory = resourceValues.isDirectory ?? false
+                let fileName = url.lastPathComponent
+                let fileSize = resourceValues.fileSize ?? 0
+                let fileType = resourceValues.contentType ?? UTType.data
+                let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
+                let creationDate = resourceValues.creationDate ?? Date.distantPast
+                let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
+                
+                
+                
+                return DirectoryItem(
+                    isDirectory: isDirectory,
+                    url: url,
+                    name: fileName,
+                    size: fileSize,
+                    fileType: fileType,
+                    lastModified: modificationDate,
+                    creationDate: creationDate,
+                    isHidden: isHidden
+                )
+            } catch {
+                print("Error getting attributes for \(url): \(error)")
+                return nil
+=======
+    func getContents(of directory: URL) throws -> [DirectoryItem] {
+        let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [
+            .isDirectoryKey,
+            .fileSizeKey,
+            .contentTypeKey,
+            .contentModificationDateKey,
+            .creationDateKey
+        ])
+        
+        return contents.compactMap { url in
+            do {
+                let resourceValues = try url.resourceValues(forKeys: [
+                    .isDirectoryKey,
+                    .fileSizeKey,
+                    .contentTypeKey,
+                    .contentModificationDateKey,
+                    .creationDateKey
+                ])
+                
+                let isDirectory = resourceValues.isDirectory ?? false
+                let fileName = url.lastPathComponent
+                let fileSize = resourceValues.fileSize ?? 0
+                let fileType = resourceValues.contentType ?? UTType.data
+                let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
+                let creationDate = resourceValues.creationDate ?? Date.distantPast
+                let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
+                
+                let isAppBundle = url.pathExtension == "app" && isDirectory
+                
+                
+                return DirectoryItem(
+                    isDirectory: isDirectory,
+                    isAppBundle: isAppBundle,
+                    url: url,
+                    name: fileName,
+                    size: fileSize,
+                    fileType: fileType,
+                    lastModified: modificationDate,
+                    creationDate: creationDate,
+                    isHidden: isHidden
+                )
+            } catch {
+                print("Error getting attributes for \(url): \(error)")
+                return nil
+>>>>>>> theirs
             }
         }.value
     }
@@ -103,6 +193,7 @@ final class FileManagerService: @unchecked Sendable {
         }.value
     }
 
+<<<<<<< ours
     func moveFile(from sourceURL: URL, to destinationURL: URL) async throws {
         try await Task.detached(priority: .userInitiated) { [fileManager] in
             let destinationPath = destinationURL.appendingPathComponent(sourceURL.lastPathComponent)
@@ -113,13 +204,32 @@ final class FileManagerService: @unchecked Sendable {
         var isDirectory = resourceValues.isDirectory ?? false
         var fileType = resourceValues.contentType ?? UTType.data
         let fileName = resourceValues.name ?? url.lastPathComponent
+||||||| ancestor
+        let isDirectory = resourceValues.isDirectory ?? false
+        let fileName = url.lastPathComponent
+=======
+        var isDirectory = resourceValues.isDirectory ?? false
+        let fileName = url.lastPathComponent
+>>>>>>> theirs
         let fileSize = resourceValues.fileSize ?? 0
+<<<<<<< ours
+||||||| ancestor
+        let fileType = resourceValues.contentType ?? UTType.data
+=======
+        var fileType = resourceValues.contentType ?? UTType.data
+>>>>>>> theirs
         let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
         let creationDate = resourceValues.creationDate ?? Date.distantPast
         let addedDate = resourceValues.addedToDirectoryDate ?? creationDate
         let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
         let isAppBundle = (resourceValues.isApplication ?? false) || url.pathExtension == "app"
 
+        if isAppBundle {
+            isDirectory = false
+            fileType = .application
+        }
+
+        let isAppBundle = url.pathExtension == "app"
         if isAppBundle {
             isDirectory = false
             fileType = .application

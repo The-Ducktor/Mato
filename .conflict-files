@@ -1,3 +1,3 @@
 ancestorEntries = []
-ourEntries = ["Mato.xcodeproj/project.pbxproj", "Mato/DirectoryTableView.swift", "Mato/FileManagerService.swift"]
-theirEntries = ["Mato.xcodeproj/project.pbxproj", "Mato/DirectoryTableView.swift", "Mato/FileManagerService.swift"]
+ourEntries = ["Mato/DirectoryTableView.swift", "Mato/SettingsView.swift"]
+theirEntries = ["Mato/DirectoryTableView.swift", "Mato/SettingsView.swift"]
