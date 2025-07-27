@@ -37,7 +37,6 @@ struct DirectoryTableView: View {
                 columnCustomization: $columnCustomization,
             ) {
                 TableColumn("Name", value: \.name) { item in
-<<<<<<< ours
                     NameCellView(
                         item: item,
                         viewModel: viewModel,
@@ -45,105 +44,6 @@ struct DirectoryTableView: View {
                         hoveredFolderID: $hoveredFolderID,
                         color: $color
                     )
-||||||| ancestor
-                    ZStack {
-                        Rectangle()
-                            .foregroundColor(isDropTargeted ? Color.blue.opacity(0.3) : .clear) // Highlight on hover
-                            .contentShape(Rectangle())
-                            .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
-                                Task {
-                                    var files: [URL] = []
-                                    
-                                    for provider in providers {
-                                        // Await the async loadItem
-                                        if let url = try? await loadFileURL(from: provider) {
-                                            print("Dropped file URL: \(url) to \(item.url)")
-                                            
-                                            if item.url == url {
-                                                print("Dropped on itself, ignoring.")
-                                                continue
-                                            }
-                                            
-                                            if item.isDirectory {
-                                                files.append(url)
-                                            } else {
-                                                print("Cannot drop files on a file item.")
-                                            }
-                                        }
-                                    }
-                                    
-                                    if !files.isEmpty {
-                                        await viewModel.moveFiles(from: files, to: item.url)
-                                        color = .green // drop occurred
-                                    }
-                                }
-                                return true
-                            }
-
-
-
-                            HStack {
-                                ImageIcon(item: .constant(item))
-                                           .frame(width: 16, height: 16)
-                                       Text(item.name)
-                                           .truncationMode(.middle)
-                                       Spacer()
-                            }
-                            .padding(.horizontal)
-                        }
-                        
-                        //.border(Color.gray) // For debugging layout
-
-=======
-                    ZStack {
-                        Rectangle()
-                            .foregroundColor(isDropTargeted ? Color.blue.opacity(0.3) : .clear) // Highlight on hover
-                            .contentShape(Rectangle())
-                            .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
-                                Task {
-                                    var files: [URL] = []
-                                    
-                                    for provider in providers {
-                                        // Await the async loadItem
-                                        if let url = try? await loadFileURL(from: provider) {
-                                            print("Dropped file URL: \(url) to \(item.url)")
-                                            
-                                            if item.url == url {
-                                                print("Dropped on itself, ignoring.")
-                                                continue
-                                            }
-                                            
-                                            if item.isDirectory {
-                                                files.append(url)
-                                            } else {
-                                                print("Cannot drop files on a file item.")
-                                            }
-                                        }
-                                    }
-                                    
-                                    if !files.isEmpty {
-                                        await viewModel.moveFiles(from: files, to: item.url)
-                                        color = .green // drop occurred
-                                    }
-                                }
-                                return true
-                            }
-
-
-
-                            HStack {
-                                ImageIcon(item: .constant(item))
-                                           .frame(width: 16, height: 16)
-                                       Text(item.isAppBundle ? item.url.deletingPathExtension().lastPathComponent : item.name)
-                                           .truncationMode(.middle)
-                                       Spacer()
-                            }
-                            .padding(.horizontal)
-                        }
-                        
-                        //.border(Color.gray) // For debugging layout
-
->>>>>>> theirs
                 }
                 .width(min: 180)
                 .alignment(.leading).customizationID("name")
