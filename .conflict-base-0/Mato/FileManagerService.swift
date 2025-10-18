@@ -30,7 +30,8 @@ final class FileManagerService: @unchecked Sendable {
                 .creationDateKey
             ])
 
-            return contents.compactMap { url in
+            var items: [DirectoryItem] = []
+            for url in contents {
                 do {
                     let resourceValues = try url.resourceValues(forKeys: [
                         .isDirectoryKey,
@@ -43,10 +44,10 @@ final class FileManagerService: @unchecked Sendable {
                         .isApplicationKey,
                         .nameKey
                     ])
-                    return self.makeDirectoryItem(from: url, with: resourceValues)
+                    let item = self.makeDirectoryItem(from: url, with: resourceValues)
+                    items.append(item)
                 } catch {
                     print("Error getting attributes for \(url): \(error)")
-                    return nil
                 }
 ||||||| ancestor
     func getContents(of directory: URL) throws -> [DirectoryItem] {
@@ -108,36 +109,19 @@ final class FileManagerService: @unchecked Sendable {
                     .fileSizeKey,
                     .contentTypeKey,
                     .contentModificationDateKey,
-                    .creationDateKey
+                    .creationDateKey,
+                    .isHiddenKey,
+                    .addedToDirectoryDateKey,
+                    .isApplicationKey,
+                    .nameKey
                 ])
-                
-                let isDirectory = resourceValues.isDirectory ?? false
-                let fileName = url.lastPathComponent
-                let fileSize = resourceValues.fileSize ?? 0
-                let fileType = resourceValues.contentType ?? UTType.data
-                let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
-                let creationDate = resourceValues.creationDate ?? Date.distantPast
-                let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
-                
-                let isAppBundle = url.pathExtension == "app" && isDirectory
-                
-                
-                return DirectoryItem(
-                    isDirectory: isDirectory,
-                    isAppBundle: isAppBundle,
-                    url: url,
-                    name: fileName,
-                    size: fileSize,
-                    fileType: fileType,
-                    lastModified: modificationDate,
-                    creationDate: creationDate,
-                    isHidden: isHidden
-                )
+                return makeDirectoryItem(from: url, with: resourceValues)
             } catch {
                 print("Error getting attributes for \(url): \(error)")
                 return nil
 >>>>>>> theirs
             }
+            return items
         }.value
     }
     
@@ -224,12 +208,6 @@ final class FileManagerService: @unchecked Sendable {
         let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
         let isAppBundle = (resourceValues.isApplication ?? false) || url.pathExtension == "app"
 
-        if isAppBundle {
-            isDirectory = false
-            fileType = .application
-        }
-
-        let isAppBundle = url.pathExtension == "app"
         if isAppBundle {
             isDirectory = false
             fileType = .application

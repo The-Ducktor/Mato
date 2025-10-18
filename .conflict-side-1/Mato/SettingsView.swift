@@ -55,6 +55,7 @@ struct SettingsView: View {
                             .controlSize(.regular)
                         }
                     }
+                   
                     
                     // Folder Selection Card
                     SettingsCard(
@@ -392,4 +393,3 @@ struct ModernPanelPreview: View {
         return (0, 0, .zero)
     }
 }
-|||||||

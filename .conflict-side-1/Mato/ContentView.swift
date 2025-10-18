@@ -14,8 +14,6 @@ struct ContentView: View {
     @StateObject private var paneManager = PaneManager()
     @StateObject private var settings = SettingsModel.shared
 
-    @StateObject private var settings = SettingsModel.shared
-
     var body: some View {
         NavigationSplitView {
             SidebarView(
@@ -42,6 +40,7 @@ struct ContentView: View {
                     }
 
                     ToolbarItemGroup(placement: .primaryAction) {
+                        ViewModeToggle()
                         LayoutMenu(paneManager: paneManager)
                         PaneControls(paneManager: paneManager)
                     }

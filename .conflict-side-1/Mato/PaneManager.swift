@@ -71,6 +71,21 @@ class PaneManager: ObservableObject {
         activePaneIndex = index
     }
     
+    func swapPanes(from sourceIndex: Int, to destinationIndex: Int) {
+        guard sourceIndex >= 0, sourceIndex < panes.count,
+              destinationIndex >= 0, destinationIndex < panes.count,
+              sourceIndex != destinationIndex else { return }
+        
+        panes.swapAt(sourceIndex, destinationIndex)
+        
+        // Update active pane index if needed
+        if activePaneIndex == sourceIndex {
+            activePaneIndex = destinationIndex
+        } else if activePaneIndex == destinationIndex {
+            activePaneIndex = sourceIndex
+        }
+    }
+    
     func setLayout(_ newLayout: PaneLayout) {
         layout = newLayout
     }
