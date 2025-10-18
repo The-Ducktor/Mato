@@ -9,8 +9,7 @@ import Foundation
 import UniformTypeIdentifiers
 import AppKit
 
-@MainActor
-class FileManagerService {
+final class FileManagerService: @unchecked Sendable {
     static let shared = FileManagerService()
     private let fileManager = FileManager.default
     
@@ -20,90 +19,95 @@ class FileManagerService {
         return fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first
     }
     
-    func getContents(of directory: URL) throws -> [DirectoryItem] {
-        let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [
-            .isDirectoryKey,
-            .fileSizeKey,
-            .contentTypeKey,
-            .contentModificationDateKey,
-            .creationDateKey
-        ])
-        
-        return contents.compactMap { url in
-            do {
-                let resourceValues = try url.resourceValues(forKeys: [
-                    .isDirectoryKey,
-                    .fileSizeKey,
-                    .contentTypeKey,
-                    .contentModificationDateKey,
-                    .creationDateKey,
-                    .isHiddenKey,
-                    .addedToDirectoryDateKey,
-                    .isApplicationKey,
-                    .nameKey
-                ])
-                return makeDirectoryItem(from: url, with: resourceValues)
-            } catch {
-                print("Error getting attributes for \(url): \(error)")
-                return nil
-            }
-        }
+    func getContents(of directory: URL) async throws -> [DirectoryItem] {
+        return try await Task.detached(priority: .userInitiated) { [self, fileManager] in
+            let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [
+                .isDirectoryKey,
+                .fileSizeKey,
+                .contentTypeKey,
+                .contentModificationDateKey,
+                .creationDateKey
+            ])
 
+            return contents.compactMap { url in
+                do {
+                    let resourceValues = try url.resourceValues(forKeys: [
+                        .isDirectoryKey,
+                        .fileSizeKey,
+                        .contentTypeKey,
+                        .contentModificationDateKey,
+                        .creationDateKey,
+                        .isHiddenKey,
+                        .addedToDirectoryDateKey,
+                        .isApplicationKey,
+                        .nameKey
+                    ])
+                    return self.makeDirectoryItem(from: url, with: resourceValues)
+                } catch {
+                    print("Error getting attributes for \(url): \(error)")
+                    return nil
+                }
+            }
+        }.value
     }
     
+    @MainActor
     func openFile(at url: URL) {
         NSWorkspace.shared.open(url)
     }
     
+    // Now executes file operations in the background using detached tasks.
     // Move or copy files to a destination directory
     func moveItems(from sourceURLs: [URL], to destinationDirectory: URL, copy: Bool = false) async throws -> Bool {
-        var success = true
-        
-        for sourceURL in sourceURLs {
-            let destinationURL = destinationDirectory.appendingPathComponent(sourceURL.lastPathComponent)
-            
-            do {
-                // Check if an item with the same name already exists
-                if fileManager.fileExists(atPath: destinationURL.path) {
-                    // Handle conflict (could be expanded to show a confirmation dialog)
-                    print("File already exists at destination: \(destinationURL.path)")
-                    continue
+        await Task.detached(priority: .userInitiated) {
+            var success = true
+            let fm = FileManager.default
+
+            for sourceURL in sourceURLs {
+                let destinationURL = destinationDirectory.appendingPathComponent(sourceURL.lastPathComponent)
+
+                do {
+                    if fm.fileExists(atPath: destinationURL.path) {
+                        print("File already exists at destination: \(destinationURL.path)")
+                        continue
+                    }
+
+                    if copy {
+                        try fm.copyItem(at: sourceURL, to: destinationURL)
+                    } else {
+                        try fm.moveItem(at: sourceURL, to: destinationURL)
+                    }
+                } catch {
+                    print("Error moving/copying \(sourceURL) to \(destinationURL): \(error)")
+                    success = false
                 }
-                
-                if copy {
-                    try fileManager.copyItem(at: sourceURL, to: destinationURL)
-                } else {
-                    try fileManager.moveItem(at: sourceURL, to: destinationURL)
-                }
-            } catch {
-                print("Error moving/copying \(sourceURL) to \(destinationURL): \(error)")
-                success = false
             }
-        }
-        
-        return success
+            return success
+        }.value
     }
 
-    func getDirectoryItem(for url: URL) throws -> DirectoryItem {
-       
-        let resourceValues = try url.resourceValues(forKeys: [
-            .isDirectoryKey,
-            .fileSizeKey,
-            .contentTypeKey,
-            .contentModificationDateKey,
-            .creationDateKey,
-            .isHiddenKey,
-            .addedToDirectoryDateKey,
-            .isApplicationKey,
-            .nameKey
-        ])
-        return makeDirectoryItem(from: url, with: resourceValues)
-
+    func getDirectoryItem(for url: URL) async throws -> DirectoryItem {
+        return try await Task.detached(priority: .userInitiated) { [self] in
+            let resourceValues = try url.resourceValues(forKeys: [
+                .isDirectoryKey,
+                .fileSizeKey,
+                .contentTypeKey,
+                .contentModificationDateKey,
+                .creationDateKey,
+                .isHiddenKey,
+                .addedToDirectoryDateKey,
+                .isApplicationKey,
+                .nameKey
+            ])
+            return self.makeDirectoryItem(from: url, with: resourceValues)
+        }.value
     }
 
-    func moveFile(from sourceURL: URL, to destinationURL: URL) throws {
-        let destinationPath = destinationURL.appendingPathComponent(sourceURL.lastPathComponent)
-        try fileManager.moveItem(at: sourceURL, to: destinationPath)
+    func moveFile(from sourceURL: URL, to destinationURL: URL) async throws {
+        try await Task.detached(priority: .userInitiated) { [fileManager] in
+            let destinationPath = destinationURL.appendingPathComponent(sourceURL.lastPathComponent)
+            try fileManager.moveItem(at: sourceURL, to: destinationPath)
+        }.value
     }
     private func makeDirectoryItem(from url: URL, with resourceValues: URLResourceValues) -> DirectoryItem {
         var isDirectory = resourceValues.isDirectory ?? false

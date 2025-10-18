@@ -1,12 +1,31 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct DraggedFiles: Transferable {
+    let urls: [URL]
+
+    static var transferRepresentation: some TransferRepresentation {
+        // Single URL representation for broad compatibility
+        DataRepresentation(exportedContentType: .fileURL) { dragged in
+            if let first = dragged.urls.first {
+                return try NSKeyedArchiver.archivedData(withRootObject: first, requiringSecureCoding: false)
+            }
+            return Data()
+        }
+        // Multi-URL representation to support dragging multiple files
+        DataRepresentation(exportedContentType: .fileURL) { dragged in
+            return try NSKeyedArchiver.archivedData(withRootObject: dragged.urls, requiringSecureCoding: false)
+        }
+    }
+}
+
 struct DirectoryTableView: View {
     @ObservedObject var viewModel: DirectoryViewModel
     @Binding var selectedItems: Set<DirectoryItem.ID>
     @Binding var sortOrder: [KeyPathComparator<DirectoryItem>]
     @State private var color: Color = .clear // testing
     @State private var isDropTargeted: Bool = false
+    @State private var hoveredFolderID: DirectoryItem.ID? = nil
     @SceneStorage("DirectoryTableViewConfig")
     private var columnCustomization: TableColumnCustomization<DirectoryItem>
 
@@ -18,54 +37,13 @@ struct DirectoryTableView: View {
                 columnCustomization: $columnCustomization,
             ) {
                 TableColumn("Name", value: \.name) { item in
-                    ZStack {
-                        Rectangle()
-                            .foregroundColor(isDropTargeted ? Color.blue.opacity(0.3) : .clear) // Highlight on hover
-                            .contentShape(Rectangle())
-                            .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
-                                Task {
-                                    var files: [URL] = []
-                                    
-                                    for provider in providers {
-                                        // Await the async loadItem
-                                        if let url = try? await loadFileURL(from: provider) {
-                                            print("Dropped file URL: \(url) to \(item.url)")
-                                            
-                                            if item.url == url {
-                                                print("Dropped on itself, ignoring.")
-                                                continue
-                                            }
-                                            
-                                            if item.isDirectory {
-                                                files.append(url)
-                                            } else {
-                                                print("Cannot drop files on a file item.")
-                                            }
-                                        }
-                                    }
-                                    
-                                    if !files.isEmpty {
-                                        await viewModel.moveFiles(from: files, to: item.url)
-                                        color = .green // drop occurred
-                                    }
-                                }
-                                return true
-                            }
-
-
-
-                            HStack {
-                                ImageIcon(item: .constant(item))
-                                           .frame(width: 16, height: 16)
-                                       Text(item.isAppBundle ? item.url.deletingPathExtension().lastPathComponent : item.name)
-                                           .truncationMode(.middle)
-                                       Spacer()
-                            }
-                            .padding(.horizontal)
-                        }
-                        
-                        //.border(Color.gray) // For debugging layout
-
+                    NameCellView(
+                        item: item,
+                        viewModel: viewModel,
+                        selectedItems: selectedItems,
+                        hoveredFolderID: $hoveredFolderID,
+                        color: $color
+                    )
                 }
                 .width(min: 180)
                 .alignment(.leading).customizationID("name")
@@ -78,42 +56,60 @@ struct DirectoryTableView: View {
                     }
                 }
                 .width(min: 100)
-                .alignment(.trailing).customizationID("size")
+                .alignment(.trailing)
+                .customizationID("size")
 
                 TableColumn("Kind", value: \.fileTypeDescription) { item in
                     Text(item.fileTypeDescription)
                 }
                 .alignment(.trailing)
+                .customizationID("kind")
 
                 TableColumn("Date Modified", value: \.lastModified) { item in
                     Text(formatDate(item.lastModified))
-                }.customizationID("dateModified")
+                }
+                .customizationID("dateModified")
+                
                 TableColumn("Date Created", value: \.creationDate) { item in
                     Text(formatDate(item.creationDate))
                 }
                 .width(min: 150)
                 .alignment(.trailing)
                 .customizationID("dateCreated")
+                .defaultVisibility(.hidden)
+                
                 TableColumn("Date Added", value: \.addedDate) { item in
                     Text(formatDate(item.addedDate))
                 }
                 .width(min: 150)
                 .alignment(.trailing)
                 .customizationID("dateAdded")
+                .defaultVisibility(.hidden)
+                
                 TableColumn(
-                    "Last Acsessed ",
+                    "Last Accessed",
                     value: \.dateLastAccessed
                 ) { item in
                     Text(formatDate(item.dateLastAccessed))
                 }
                 .width(min: 150)
                 .alignment(.trailing)
-                .customizationID("dateAdded")
+                .customizationID("dateLastAccessed")
+                .defaultVisibility(.hidden)
             } rows: {
                 ForEach(viewModel.items) { item in
                     TableRow(item)
-                        .draggable(item.url)
-                     
+                        .draggable({
+                            let urlsToDrag: [URL]
+                            if selectedItems.contains(item.id) {
+                                urlsToDrag = selectedItems.compactMap { id in
+                                    viewModel.items.first { $0.id == id }?.url
+                                }
+                            } else {
+                                urlsToDrag = [item.url]
+                            }
+                            return DraggedFiles(urls: urlsToDrag)
+                        }())
                 }
             }
             .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
@@ -126,17 +122,41 @@ struct DirectoryTableView: View {
                     continuation.resume(throwing: error)
                     return
                 }
-                guard let data = data as? Data,
-                      let url = URL(dataRepresentation: data, relativeTo: nil) else {
-                    continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: nil))
+                
+                // Handle different data types
+                if let url = data as? URL {
+                    // Direct URL object
+                    continuation.resume(returning: url)
                     return
                 }
-                continuation.resume(returning: url)
+                
+                if let data = data as? Data {
+                    // Try to unarchive the URL from NSKeyedArchiver format
+                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
+                        continuation.resume(returning: url)
+                        return
+                    }
+                    
+                    // Try to unarchive an array of URLs
+                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL],
+                       let firstURL = urls.first {
+                        continuation.resume(returning: firstURL)
+                        return
+                    }
+                    
+                    // Fallback: try URL(dataRepresentation:)
+                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
+                        continuation.resume(returning: url)
+                        return
+                    }
+                }
+                
+                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
             }
         }
     }
 
-    
+
     private func formatDate(_ date: Date) -> String {
         let now = Date()
         let calendar = Calendar.current
@@ -152,6 +172,100 @@ struct DirectoryTableView: View {
             return formatter.string(from: date)
         }
     }
+    
+}
+
+// Separate view component for Name cell to properly handle @State
+struct NameCellView: View {
+    let item: DirectoryItem
+    let viewModel: DirectoryViewModel
+    let selectedItems: Set<DirectoryItem.ID>
+    @Binding var hoveredFolderID: DirectoryItem.ID?
+    @Binding var color: Color
+    @State private var isRowTargeted = false
+    
+    var body: some View {
+        HStack {
+            ImageIcon(item: .constant(item))
+                .frame(width: 16, height: 16)
+            Text(item.isAppBundle ? item.url.deletingPathExtension().lastPathComponent : item.name)
+                .truncationMode(.middle)
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(isRowTargeted && item.isDirectory ? Color.accentColor.opacity(0.25) : Color.clear)
+        )
+        .onDrop(of: [UTType.fileURL], isTargeted: $isRowTargeted) { providers in
+            guard item.isDirectory else { return false }
+
+            Task {
+                var files: [URL] = []
+
+                for provider in providers {
+                    if let url = try? await loadFileURL(from: provider) {
+                        if item.url == url {
+                            continue
+                        }
+                        if item.isDirectory {
+                            files.append(url)
+                        }
+                    }
+                }
+
+                if !files.isEmpty {
+                    viewModel.moveFiles(from: files, to: item.url)
+                    color = .green
+                }
+            }
+            return true
+        }
+        .onChange(of: isRowTargeted) { _, newValue in
+            if newValue && item.isDirectory {
+                hoveredFolderID = item.id
+            } else if hoveredFolderID == item.id {
+                hoveredFolderID = nil
+            }
+        }
+    }
+    
+    private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                if let url = data as? URL {
+                    continuation.resume(returning: url)
+                    return
+                }
+                
+                if let data = data as? Data {
+                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
+                        continuation.resume(returning: url)
+                        return
+                    }
+                    
+                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL],
+                       let firstURL = urls.first {
+                        continuation.resume(returning: firstURL)
+                        return
+                    }
+                    
+                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
+                        continuation.resume(returning: url)
+                        return
+                    }
+                }
+                
+                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
+            }
+        }
+    }
 }
 
 // You'll need to create a new drop delegate for the table
@@ -163,33 +277,67 @@ struct TableDropDelegate: DropDelegate {
         let itemProviders = info.itemProviders(for: [.fileURL])
         guard !itemProviders.isEmpty else { return false }
 
-        var urls: [URL] = []
-        let dispatchGroup = DispatchGroup()
-
-        for itemProvider in itemProviders {
-            dispatchGroup.enter()
-            itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+        Task { @MainActor in
+            var urls: [URL] = []
+            
+            for itemProvider in itemProviders {
+                if let url = try? await loadFileURL(from: itemProvider) {
                     urls.append(url)
                 }
-                dispatchGroup.leave()
             }
-        }
-
-        dispatchGroup.notify(queue: .main) {
-            Task { @MainActor in
-                if let currentDirectory = viewModel.currentDirectory {
-                    viewModel.moveFiles(from: urls, to: currentDirectory)
-                    // Compose message
-                    let fileNames = urls.map { $0.lastPathComponent }.joined(separator: ", ")
-                    let source = urls.first?.deletingLastPathComponent().path ?? "?"
-                    let dest = currentDirectory.path
-                    let message = "file \(fileNames) from \(source) to \(dest)"
-                    setDropMessage?(message)
-                }
+            
+            if !urls.isEmpty, let currentDirectory = viewModel.currentDirectory {
+                viewModel.moveFiles(from: urls, to: currentDirectory)
+                // Compose message
+                let fileNames = urls.map { $0.lastPathComponent }.joined(separator: ", ")
+                let source = urls.first?.deletingLastPathComponent().path ?? "?"
+                let dest = currentDirectory.path
+                let message = "file \(fileNames) from \(source) to \(dest)"
+                setDropMessage?(message)
             }
         }
         return true
+    }
+    
+    private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
+        try await withCheckedThrowingContinuation { continuation in
+            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                
+                // Handle different data types
+                if let url = data as? URL {
+                    // Direct URL object
+                    continuation.resume(returning: url)
+                    return
+                }
+                
+                if let data = data as? Data {
+                    // Try to unarchive the URL from NSKeyedArchiver format
+                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
+                        continuation.resume(returning: url)
+                        return
+                    }
+                    
+                    // Try to unarchive an array of URLs
+                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL],
+                       let firstURL = urls.first {
+                        continuation.resume(returning: firstURL)
+                        return
+                    }
+                    
+                    // Fallback: try URL(dataRepresentation:)
+                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
+                        continuation.resume(returning: url)
+                        return
+                    }
+                }
+                
+                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
+            }
+        }
     }
     
     func dropEntered(info: DropInfo) {
@@ -200,3 +348,4 @@ struct TableDropDelegate: DropDelegate {
         // Optional: Handle visual feedback when drag exits
     }
 }
+

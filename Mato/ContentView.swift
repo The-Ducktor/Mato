@@ -11,244 +11,67 @@ struct ContentView: View {
     @State private var searchText: String = ""
     @StateObject private var pinnedFolderStore = PinnedFolderStore.shared
     @State private var showingAddPinnedFolderSheet = false
-
-    // Multiple panes management
     @StateObject private var paneManager = PaneManager()
-    @State private var showingPaneSelector = false
-
     @StateObject private var settings = SettingsModel.shared
 
     var body: some View {
         NavigationSplitView {
-            List {
-                Section("Quick Access") {
-                    Button {
-                        paneManager.activePane?.loadDownloadsDirectory()
-                    } label: {
-                        Label("Downloads", systemImage: "arrow.down.circle")
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        let homeURL = FileManager.default.homeDirectoryForCurrentUser
-                        paneManager.activePane?.loadDirectory(at: homeURL)
-                        paneManager.activePane?.currentDirectory = homeURL
-                        paneManager.activePane?.navigationStack = [homeURL]
-                    } label: {
-                        Label("Home", systemImage: "house")
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                Section {
-                    ForEach(pinnedFolderStore.pinnedFolders) { folder in
-                        Button {
-                            paneManager.activePane?.loadDirectory(at: folder.url)
-                            paneManager.activePane?.currentDirectory = folder.url
-                            paneManager.activePane?.navigationStack = [folder.url]
-                        } label: {
-                            Label(folder.name, systemImage: "folder")
-                        }
-                        .buttonStyle(.plain)
-                        .contextMenu {
-                            Button("Remove", role: .destructive) {
-                                pinnedFolderStore.removePinnedFolder(with: folder.id)
-                            }
-                        }
-                    }
-
-                    Button("Pin Current Folder") {
-                        if let currentURL = paneManager.activePane?.currentDirectory {
-                            pinnedFolderStore.addPinnedFolder(currentURL)
-                        }
-                    }
-                    .disabled(paneManager.activePane?.currentDirectory == nil)
-                    .buttonStyle(.bordered)
-                } header: {
-                    HStack {
-                        Text("Pinned Folders")
-                        Spacer()
-                    }
-                }
-
-                Section("Panes") {
-                    ForEach(paneManager.panes.indices, id: \.self) { index in
-                        HStack {
-                            Button {
-                                paneManager.setActivePane(index: index)
-                            } label: {
-                                HStack {
-                                    Circle()
-                                        .fill(paneManager.activePaneIndex == index ? Color.accentColor : .gray)
-                                        .frame(width: 8, height: 8)
-                                    Text("Pane \(index + 1)")
-                                    Spacer()
-                                    Text(paneManager.panes[index].currentDirectory?.lastPathComponent ?? "No folder")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .buttonStyle(.plain)
-
-                            if paneManager.panes.count > 1 {
-                                Button {
-                                    paneManager.removePane(at: index)
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-
-                    Button("Add Pane") {
-                        paneManager.addPane()
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(paneManager.panes.count >= 4) // Limit to 4 panes for UI reasons
-                }
-            }
-            .navigationTitle("Mato")
+            SidebarView(
+                paneManager: paneManager,
+                pinnedFolderStore: pinnedFolderStore,
+                showingAddPinnedFolderSheet: $showingAddPinnedFolderSheet
+            )
             .sheet(isPresented: $showingAddPinnedFolderSheet) {
                 AddPinnedFolderView()
             }
         } detail: {
-            // Use the new PaneAreaView
             PaneAreaView(paneManager: paneManager)
                 .navigationTitle(paneManager.activePane?.currentDirectory?.lastPathComponent ?? "Mato")
                 .toolbar {
-                    // Leading toolbar items (left side)
                     ToolbarItemGroup(placement: .navigation) {
-                        // Pane indicator
-                        Text("\(paneManager.activePaneIndex + 1)/\(paneManager.panes.count)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                        PaneIndicator(
+                            activeIndex: paneManager.activePaneIndex,
+                            totalPanes: paneManager.panes.count
+                        )
                     }
 
-                    // Principal toolbar item (center - search)
                     ToolbarItem(placement: .principal) {
-                        HStack {
-                            TextField("Search", text: $searchText)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(minWidth: 200, maxWidth: 400)
-
-                            // Clear search button
-                            if !searchText.isEmpty {
-                                Button {
-                                    searchText = ""
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
+                        SearchBar(searchText: $searchText)
                     }
 
-                    // Trailing toolbar items (right side)
                     ToolbarItemGroup(placement: .primaryAction) {
-                        // Layout selector
-                        Menu {
-                            Button {
-                                paneManager.setLayout(.single)
-                            } label: {
-                                HStack {
-                                    Text("Single Pane")
-                                    Image(systemName: "rectangle")
-                                    
-                                }
-                              
-                             
-                            }
-
-                            Button {
-                                paneManager.setLayout(.dual)
-                                if paneManager.panes.count < 2 {
-                                    paneManager.addPane()
-                                }
-                            } label: {
-                                HStack {
-                                    Text("Dual Pane")
-                                    Image(systemName: "rectangle.split.2x1")
-                                }
-                            }
-
-                            if paneManager.panes.count >= 3 {
-                                Button {
-                                    paneManager.setLayout(.triple)
-                                } label: {
-                                    HStack {
-                                        Text("Triple Pane")
-                                        Image(systemName: "rectangle.split.3x1")
-                                    }
-                                }
-                            }
-
-                            if paneManager.panes.count >= 4 {
-                                Button {
-                                    paneManager.setLayout(.quad)
-                                } label: {
-                                    HStack {
-                                        Text("Quad Pane")
-                                        Image(systemName: "rectangle.split.2x2")
-                                    }
-                                }
-                            }
-                        } label: {
-                            Image(systemName: layoutIcon(for: paneManager.layout))
-                        }
-                        .help("Change Layout")
-
-                        // Add pane button
-                        Button {
-                            paneManager.addPane()
-                        } label: {
-                            Image(systemName: "plus.rectangle")
-                        }
-                        .disabled(paneManager.panes.count >= 4)
-                        .help("Add Pane")
-
-                        // Remove active pane button
-                        if paneManager.panes.count > 1 {
-                            Button {
-                                paneManager.removePane(at: paneManager.activePaneIndex)
-                            } label: {
-                                Image(systemName: "minus.rectangle")
-                            }
-                            .help("Close Active Pane")
-                        }
+                        LayoutMenu(paneManager: paneManager)
+                        PaneControls(paneManager: paneManager)
                     }
                 }
         }
         .onAppear {
-            // Initialize panes and folder from settings
-            if paneManager.panes.isEmpty {
-                for _ in 0..<settings.defaultPaneCount {
-                    paneManager.addPane()
-                }
-                paneManager.setLayout(settings.defaultPaneCount == 1 ? .single : settings.defaultPaneCount == 2 ? .dual : settings.defaultPaneCount == 3 ? .triple : .quad)
-                paneManager.setActivePane(index: 0)
-                let defaultURL = URL(fileURLWithPath: settings.defaultFolder)
-                paneManager.panes.forEach { $0.loadDirectory(at: defaultURL) }
-            }
+            initializePanes()
         }
     }
-
-    // Helper function to get the appropriate icon for each layout
-    private func layoutIcon(for layout: PaneLayout) -> String {
-        switch layout {
-        case .single:
-            return "rectangle"
-        case .dual:
-            return "rectangle.split.2x1"
-        case .triple:
-            return "rectangle.split.3x1"
-        case .quad:
-            return "rectangle.split.2x2"
+    
+    private func initializePanes() {
+        guard paneManager.panes.isEmpty else { return }
+        
+        let count = settings.defaultPaneCount
+        let defaultURL = URL(fileURLWithPath: settings.defaultFolder)
+        
+        for _ in 0..<count {
+            paneManager.addPane()
+        }
+        
+        paneManager.setLayout(layoutForPaneCount(count))
+        paneManager.setActivePane(index: 0)
+        paneManager.panes.forEach { $0.loadDirectory(at: defaultURL) }
+    }
+    
+    private func layoutForPaneCount(_ count: Int) -> PaneLayout {
+        switch count {
+        case 1: return .single
+        case 2: return .dual
+        case 3: return .triple
+        case 4: return .quad
+        default: return .dual
         }
     }
 }
@@ -299,66 +122,7 @@ struct FileManagerPane: View {
     }
 }
 
-// MARK: - Pane Manager
-@MainActor
-class PaneManager: ObservableObject {
-    @Published var panes: [DirectoryViewModel] = []
-    @Published var activePaneIndex: Int = 0
-    @Published var layout: PaneLayout = .dual
 
-    var activePane: DirectoryViewModel? {
-        guard activePaneIndex < panes.count else { return nil }
-        return panes[activePaneIndex]
-    }
-
-    init() {
-        // Don't create panes in init - do it in onAppear of the view
-    }
-
-    func addPane() {
-        guard panes.count < 4 else { return } // Maximum 4 panes
-        let newPane = DirectoryViewModel()
-        panes.append(newPane)
-    }
-
-    func removePane(at index: Int) {
-        guard panes.count > 1, index < panes.count else { return }
-
-        panes.remove(at: index)
-
-        // Adjust active pane index
-        if activePaneIndex >= panes.count {
-            activePaneIndex = panes.count - 1
-        } else if activePaneIndex > index {
-            activePaneIndex -= 1
-        }
-
-        // Adjust layout if necessary
-        if panes.count == 1 {
-            layout = .single
-        } else if panes.count == 2 && (layout == .triple || layout == .quad) {
-            layout = .dual
-        } else if panes.count == 3 && layout == .quad {
-            layout = .triple
-        }
-    }
-
-    func setActivePane(index: Int) {
-        guard index < panes.count else { return }
-        activePaneIndex = index
-    }
-
-    func setLayout(_ newLayout: PaneLayout) {
-        layout = newLayout
-    }
-}
-
-enum PaneLayout {
-    case single
-    case dual
-    case triple
-    case quad
-}
 
 struct AddPinnedFolderView: View {
     @State private var folderURL: URL?

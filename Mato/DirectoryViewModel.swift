@@ -73,7 +73,7 @@ class DirectoryViewModel: ObservableObject {
         Task { [weak self, fileManager] in
             do {
                 // Get contents on background thread using captured fileManager
-                let contents = try fileManager.getContents(of: url)
+                let contents = try await fileManager.getContents(of: url)
 
                 // Filter hidden files if needed
                 let filteredContents = shouldHideHiddenFiles ?
@@ -439,7 +439,7 @@ class DirectoryViewModel: ObservableObject {
     func moveFile(from sourceURL: URL, to destinationURL: URL) {
         Task {
             do {
-                try fileManager.moveFile(from: sourceURL, to: destinationURL)
+                try await fileManager.moveFile(from: sourceURL, to: destinationURL)
                 refreshCurrentDirectory()
             } catch {
                 errorMessage = "Error moving file: \(error.localizedDescription)"
@@ -451,7 +451,7 @@ class DirectoryViewModel: ObservableObject {
         Task {
             do {
                 for sourceURL in sourceURLs {
-                    try fileManager.moveFile(from: sourceURL, to: destinationURL)
+                    try await fileManager.moveFile(from: sourceURL, to: destinationURL)
                 }
                 refreshCurrentDirectory()
             } catch {
@@ -464,24 +464,19 @@ class DirectoryViewModel: ObservableObject {
         let itemProviders = info.itemProviders(for: [.fileURL])
         guard !itemProviders.isEmpty else { return false }
 
-        var urls: [URL] = []
-        let dispatchGroup = DispatchGroup()
-
-        for itemProvider in itemProviders {
-            dispatchGroup.enter()
-            itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let urlData = data as? Data, let url = URL(dataRepresentation: urlData, relativeTo: nil) {
+        Task { @MainActor in
+            var urls: [URL] = []
+            
+            for itemProvider in itemProviders {
+                if let data = try? await itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier),
+                   let urlData = data as? Data,
+                   let url = URL(dataRepresentation: urlData, relativeTo: nil) {
                     urls.append(url)
                 }
-                dispatchGroup.leave()
             }
-        }
-
-        dispatchGroup.notify(queue: .main) {
-            Task { @MainActor in
-                if let destinationURL = self.currentDirectory {
-                    self.moveFiles(from: urls, to: destinationURL)
-                }
+            
+            if !urls.isEmpty, let destinationURL = self.currentDirectory {
+                self.moveFiles(from: urls, to: destinationURL)
             }
         }
         return true
