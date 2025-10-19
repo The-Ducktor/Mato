@@ -205,12 +205,14 @@ struct NameCellView: View {
                 var files: [URL] = []
 
                 for provider in providers {
-                    if let url = try? await loadFileURL(from: provider) {
-                        if item.url == url {
-                            continue
-                        }
-                        if item.isDirectory {
-                            files.append(url)
+                    if let urls = try? await loadFileURLs(from: provider) {
+                        for url in urls {
+                            if item.url == url {
+                                continue
+                            }
+                            if item.isDirectory {
+                                files.append(url)
+                            }
                         }
                     }
                 }
@@ -231,7 +233,7 @@ struct NameCellView: View {
         }
     }
     
-    private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
+    private func loadFileURLs(from provider: NSItemProvider) async throws -> [URL] {
         try await withCheckedThrowingContinuation { continuation in
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
                 if let error = error {
@@ -240,24 +242,26 @@ struct NameCellView: View {
                 }
                 
                 if let url = data as? URL {
-                    continuation.resume(returning: url)
+                    continuation.resume(returning: [url])
                     return
                 }
                 
                 if let data = data as? Data {
+                    // Try to unarchive an ARRAY of URLs first (multi-select case)
+                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
+                        continuation.resume(returning: urls)
+                        return
+                    }
+                    
+                    // Try to unarchive a single URL
                     if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: url)
+                        continuation.resume(returning: [url])
                         return
                     }
                     
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL],
-                       let firstURL = urls.first {
-                        continuation.resume(returning: firstURL)
-                        return
-                    }
-                    
+                    // Fallback: try URL(dataRepresentation:)
                     if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: url)
+                        continuation.resume(returning: [url])
                         return
                     }
                 }
@@ -281,13 +285,16 @@ struct TableDropDelegate: DropDelegate {
             var urls: [URL] = []
             
             for itemProvider in itemProviders {
-                if let url = try? await loadFileURL(from: itemProvider) {
-                    urls.append(url)
+                if let urlsFromProvider = try? await loadFileURLs(from: itemProvider) {
+                    urls.append(contentsOf: urlsFromProvider)
                 }
             }
             
-            if !urls.isEmpty, let currentDirectory = viewModel.currentDirectory {
-                viewModel.moveFiles(from: urls, to: currentDirectory)
+            // Deduplicate URLs - each provider may contain the full array
+            let uniqueURLs = Array(Set(urls))
+            
+            if !uniqueURLs.isEmpty, let currentDirectory = viewModel.currentDirectory {
+                viewModel.moveFiles(from: uniqueURLs, to: currentDirectory)
                 // Compose message
                 let fileNames = urls.map { $0.lastPathComponent }.joined(separator: ", ")
                 let source = urls.first?.deletingLastPathComponent().path ?? "?"
@@ -299,7 +306,7 @@ struct TableDropDelegate: DropDelegate {
         return true
     }
     
-    private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
+    private func loadFileURLs(from provider: NSItemProvider) async throws -> [URL] {
         try await withCheckedThrowingContinuation { continuation in
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
                 if let error = error {
@@ -309,28 +316,26 @@ struct TableDropDelegate: DropDelegate {
                 
                 // Handle different data types
                 if let url = data as? URL {
-                    // Direct URL object
-                    continuation.resume(returning: url)
+                    continuation.resume(returning: [url])
                     return
                 }
                 
                 if let data = data as? Data {
-                    // Try to unarchive the URL from NSKeyedArchiver format
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: url)
+                    // Try to unarchive an ARRAY of URLs first (multi-select case)
+                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
+                        continuation.resume(returning: urls)
                         return
                     }
                     
-                    // Try to unarchive an array of URLs
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL],
-                       let firstURL = urls.first {
-                        continuation.resume(returning: firstURL)
+                    // Try to unarchive a single URL
+                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
+                        continuation.resume(returning: [url])
                         return
                     }
                     
                     // Fallback: try URL(dataRepresentation:)
                     if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: url)
+                        continuation.resume(returning: [url])
                         return
                     }
                 }
