@@ -12,34 +12,20 @@ struct DirectoryDropDelegate: DropDelegate {
         guard !itemProviders.isEmpty else { return false }
 
         Task { @MainActor in
-            var seenURLs = Set<String>()
             var sourceURLs: [URL] = []
             
-            print("🔍 DROP DEBUG: Got \(itemProviders.count) item providers")
-            
-            for (index, itemProvider) in itemProviders.enumerated() {
+            for itemProvider in itemProviders {
                 let urls = try? await loadFileURLs(from: itemProvider)
                 if let urls = urls {
-                    print("  Provider [\(index)] returned \(urls.count) URLs:")
-                    for url in urls {
-                        print("    - \(url.lastPathComponent)")
-                        // Use the absolute path as the unique identifier
-                        let path = url.path
-                        if !seenURLs.contains(path) {
-                            seenURLs.insert(path)
-                            sourceURLs.append(url)
-                        }
-                    }
+                    sourceURLs.append(contentsOf: urls)
                 }
             }
             
-            print("🎯 Final unique URLs: \(sourceURLs.count)")
-            for url in sourceURLs {
-                print("  - \(url.lastPathComponent)")
-            }
+            // Deduplicate URLs - each provider may contain the full array
+            let uniqueURLs = Array(Set(sourceURLs))
             
-            if !sourceURLs.isEmpty, let currentDirectory = viewModel.currentDirectory {
-                viewModel.moveFiles(from: sourceURLs, to: currentDirectory)
+            if !uniqueURLs.isEmpty, let currentDirectory = viewModel.currentDirectory {
+                viewModel.moveFiles(from: uniqueURLs, to: currentDirectory)
             }
         }
 
@@ -99,34 +85,20 @@ struct ItemDropDelegate: DropDelegate {
         guard !itemProviders.isEmpty else { return false }
 
         Task { @MainActor in
-            var seenURLs = Set<String>()
             var sourceURLs: [URL] = []
             
-            print("🔍 ITEM DROP DEBUG: Got \(itemProviders.count) item providers")
-            
-            for (index, itemProvider) in itemProviders.enumerated() {
+            for itemProvider in itemProviders {
                 let urls = try? await loadFileURLs(from: itemProvider)
                 if let urls = urls {
-                    print("  Provider [\(index)] returned \(urls.count) URLs:")
-                    for url in urls {
-                        print("    - \(url.lastPathComponent)")
-                        // Use the absolute path as the unique identifier
-                        let path = url.path
-                        if !seenURLs.contains(path) {
-                            seenURLs.insert(path)
-                            sourceURLs.append(url)
-                        }
-                    }
+                    sourceURLs.append(contentsOf: urls)
                 }
             }
             
-            print("🎯 Final unique URLs: \(sourceURLs.count)")
-            for url in sourceURLs {
-                print("  - \(url.lastPathComponent)")
-            }
+            // Deduplicate URLs - each provider may contain the full array
+            let uniqueURLs = Array(Set(sourceURLs))
             
-            if !sourceURLs.isEmpty {
-                viewModel.moveFiles(from: sourceURLs, to: item.url)
+            if !uniqueURLs.isEmpty {
+                viewModel.moveFiles(from: uniqueURLs, to: item.url)
             }
         }
 

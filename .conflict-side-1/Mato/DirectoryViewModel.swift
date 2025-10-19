@@ -11,21 +11,7 @@ import UniformTypeIdentifiers
 
 @MainActor
 class DirectoryViewModel: ObservableObject {
-    // Sorting and sortedItems are now managed reactively and debounced for UI safety.
-    @Published var items: [DirectoryItem] = [] {
-        didSet {
-            // Immediately update sortedItems when items change to prevent index out of bounds
-            updateSortedItems()
-        }
-    }
-    @Published var sortedItems: [DirectoryItem] = []
-    @Published var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod) {
-        didSet {
-            // Immediately update sortedItems when sort order changes
-            updateSortedItems()
-        }
-    }
-
+    @Published var items: [DirectoryItem] = []
     @Published var currentDirectory: URL?
     @Published var navigationStack: [URL] = []
     @Published var forwardStack: [URL] = []
@@ -48,9 +34,6 @@ class DirectoryViewModel: ObservableObject {
 
     // Directory watching service
     private var directoryWatcherService: DirectoryWatcherService?
-    
-    // Flag to prevent concurrent sorting operations
-    private var isUpdatingSortedItems = false
 
     init() {
         // Use default folder from settings
@@ -73,6 +56,12 @@ class DirectoryViewModel: ObservableObject {
     }
 
     func loadDirectory(at url: URL) {
+        isLoading = true
+        errorMessage = nil
+
+        // Update path string
+        pathString = url.path
+
         // Stop previous watcher by releasing the service (handled by ARC)
         directoryWatcherService = nil
 
@@ -85,16 +74,8 @@ class DirectoryViewModel: ObservableObject {
 
         // Capture the current state we need in the background task
         let shouldHideHiddenFiles = hideHiddenFiles
-        let previousItems = items // Keep previous items in case of error
 
-        // Defer all published property updates to avoid "publishing during view update" warnings
-        Task { @MainActor [weak self, fileManager] in
-            guard let self = self else { return }
-            
-            self.isLoading = true
-            self.errorMessage = nil
-            self.pathString = url.path
-            
+        Task { [weak self, fileManager] in
             do {
                 // Get contents on background thread using captured fileManager
                 let contents = try await fileManager.getContents(of: url)
@@ -103,38 +84,21 @@ class DirectoryViewModel: ObservableObject {
                 let filteredContents = shouldHideHiddenFiles ?
                 contents.filter { !($0.isHidden) } : contents
 
+                // sort by date newest first
+                let sortedContents = filteredContents.sorted { $0.lastModified > $1.lastModified }
+
                 // Set items directly, no sorting.
-                self.items = filteredContents
+                guard let self = self else { return }
+                self.items = sortedContents
                 self.isLoading = false
 
             } catch {
-                // Handle error on main actor - keep previous items and stay in current directory
+                // Handle error on main actor
+                guard let self = self else { return }
                 self.errorMessage = "Error loading directory: \(error.localizedDescription)"
-                self.items = previousItems // Restore previous items
                 self.isLoading = false
-                
-                // Reset path string to current directory
-                if let currentDir = self.currentDirectory {
-                    self.pathString = currentDir.path
-                }
             }
         }
-    }
-
-    private func updateSortedItems() {
-        // Prevent concurrent sorting operations
-        guard !isUpdatingSortedItems else { return }
-        
-        isUpdatingSortedItems = true
-        defer { isUpdatingSortedItems = false }
-        
-        sortedItems = items.sorted(using: sortOrder)
-    }
-
-    func setSortOrder(_ newSortOrder: [KeyPathComparator<DirectoryItem>]) {
-        // Update happens automatically via didSet, but we set it explicitly here
-        // to be clear about the intent
-        sortOrder = newSortOrder
     }
 
     func openItem(_ item: DirectoryItem) {
@@ -614,4 +578,3 @@ class DirectoryViewModel: ObservableObject {
     // MARK: - Directory Watching
     // (All logic now handled by DirectoryWatcherService)
 }
-

@@ -5,10 +5,16 @@ struct DraggedFiles: Transferable {
     let urls: [URL]
 
     static var transferRepresentation: some TransferRepresentation {
-        // Provide all URLs for multi-select support
+        // Single URL representation for broad compatibility
         DataRepresentation(exportedContentType: .fileURL) { dragged in
-            // Archive all URLs together for multi-select drag support
-            return try NSKeyedArchiver.archivedData(withRootObject: dragged.urls as NSArray, requiringSecureCoding: false)
+            if let first = dragged.urls.first {
+                return try NSKeyedArchiver.archivedData(withRootObject: first, requiringSecureCoding: false)
+            }
+            return Data()
+        }
+        // Multi-URL representation to support dragging multiple files
+        DataRepresentation(exportedContentType: .fileURL) { dragged in
+            return try NSKeyedArchiver.archivedData(withRootObject: dragged.urls, requiringSecureCoding: false)
         }
     }
 }
@@ -20,10 +26,6 @@ struct DirectoryTableView: View {
     @State private var color: Color = .clear // testing
     @State private var isDropTargeted: Bool = false
     @State private var hoveredFolderID: DirectoryItem.ID? = nil
-    @State private var tableRebuildID = UUID() // Force table rebuild on sort changes
-    @State private var sortUpdateTask: Task<Void, Never>? = nil // Debounce sort updates
-    @State private var localSortOrder: [KeyPathComparator<DirectoryItem>] = [] // Local copy to prevent binding conflicts
-    @State private var isProcessingSortChange = false // Prevent re-entrant updates
     @SceneStorage("DirectoryTableViewConfig")
     private var columnCustomization: TableColumnCustomization<DirectoryItem>
 
@@ -31,7 +33,7 @@ struct DirectoryTableView: View {
         VStack(alignment: .leading, spacing: 0) {
             Table(
                 selection: $selectedItems,
-                sortOrder: $localSortOrder,
+                sortOrder: $sortOrder,
                 columnCustomization: $columnCustomization,
             ) {
                 TableColumn("Name", value: \.name) { item in
@@ -95,86 +97,24 @@ struct DirectoryTableView: View {
                 .customizationID("dateLastAccessed")
                 .defaultVisibility(.hidden)
             } rows: {
-                ForEach(viewModel.sortedItems) { item in
+                ForEach(viewModel.items) { item in
                     TableRow(item)
-                        .draggable(makeDraggedFiles(for: item))
+                        .draggable({
+                            let urlsToDrag: [URL]
+                            if selectedItems.contains(item.id) {
+                                urlsToDrag = selectedItems.compactMap { id in
+                                    viewModel.items.first { $0.id == id }?.url
+                                }
+                            } else {
+                                urlsToDrag = [item.url]
+                            }
+                            return DraggedFiles(urls: urlsToDrag)
+                        }())
                 }
             }
-            .id(tableRebuildID) // Force complete rebuild when this changes
-            .animation(.none, value: localSortOrder) // Disable animations on sort order changes to prevent crashes
             .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
-            .onAppear {
-                // Initialize local sort order from binding
-                localSortOrder = sortOrder
-            }
-            .onChange(of: localSortOrder) { oldValue, newValue in
-                // Prevent re-entrant updates
-                guard !isProcessingSortChange else { return }
-                isProcessingSortChange = true
-                
-                // Cancel any pending sort update
-                sortUpdateTask?.cancel()
-                
-                // Immediately clear selection to prevent index issues
-                selectedItems.removeAll()
-                
-                // Update immediately - no delay needed since we're disabling animations
-                sortUpdateTask = Task { @MainActor in
-                    guard !Task.isCancelled else {
-                        isProcessingSortChange = false
-                        return
-                    }
-                    
-                    // Disable animations and update sort order immediately to prevent table crashes
-                    var transaction = Transaction()
-                    transaction.disablesAnimations = true
-                    withTransaction(transaction) {
-                        // Update the view model
-                        viewModel.setSortOrder(newValue)
-                        // Update the external binding
-                        sortOrder = newValue
-                        // Force complete table rebuild by changing the ID
-                        tableRebuildID = UUID()
-                    }
-                    
-                    isProcessingSortChange = false
-                }
-            }
-            .onChange(of: sortOrder) { _, newValue in
-                // Sync external changes back to local state (e.g., from settings)
-                guard !isProcessingSortChange else { return }
-                localSortOrder = newValue
-            }
-            .onChange(of: viewModel.currentDirectory) { _, _ in
-                // Clear selection when changing directories to prevent stale references
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    selectedItems.removeAll()
-                    // Force table rebuild on directory change
-                    tableRebuildID = UUID()
-                }
-            }
         }
     }
-    
-    private func makeDraggedFiles(for item: DirectoryItem) -> DraggedFiles {
-        let urlsToDrag: [URL]
-        // Only compute URLs when drag actually happens
-        if selectedItems.contains(item.id), selectedItems.count > 1 {
-            // More efficient lookup for multiple selections
-            let selectedSet = selectedItems
-            urlsToDrag = viewModel.sortedItems.reduce(into: []) { result, current in
-                if selectedSet.contains(current.id) {
-                    result.append(current.url)
-                }
-            }
-        } else {
-            urlsToDrag = [item.url]
-        }
-        return DraggedFiles(urls: urlsToDrag)
-    }
-
     private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
@@ -217,28 +157,19 @@ struct DirectoryTableView: View {
     }
 
 
-    // Cache formatters to avoid recreating them for every cell
-    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter
-    }()
-    
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
     private func formatDate(_ date: Date) -> String {
         let now = Date()
         let calendar = Calendar.current
         
         if calendar.isDateInToday(date) || calendar.isDateInYesterday(date) || calendar.isDateInTomorrow(date) {
-            return Self.relativeDateFormatter.localizedString(for: date, relativeTo: now)
+            let relativeFormatter = RelativeDateTimeFormatter()
+            relativeFormatter.unitsStyle = .full
+            return relativeFormatter.localizedString(for: date, relativeTo: now)
         } else {
-            return Self.dateFormatter.string(from: date)
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            return formatter.string(from: date)
         }
     }
     

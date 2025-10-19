@@ -11,7 +11,6 @@ class SettingsModel: ObservableObject {
     @AppStorage("defaultSortMethod") var defaultSortMethod: String = "date"
     @AppStorage("defaultFolder") var defaultFolder: String = FileManager.default.homeDirectoryForCurrentUser.path
     @AppStorage("defaultPaneCount") var defaultPaneCount: Int = 2
-    @AppStorage("viewMode") var viewMode: String = "list"
     
     let sortMethods: [String] = ["name", "date", "size", "type","created"]
     
