@@ -14,25 +14,33 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
 
     public let id = UUID()
     var isDirectory: Bool
+    var isAppBundle: Bool
     var url: URL
     var name: String = "Unknown"
     var size: Int = 0
     var fileType: UTType = .text
     var lastModified: Date = Date()
     var creationDate: Date = Date()
+    var addedDate: Date = Date()
+    var dateLastAccessed: Date = Date()
     var isHidden: Bool = false
+   
     
     public init(
         isDirectory: Bool,
+        isAppBundle: Bool,
         url: URL,
         name: String,
         size: Int,
         fileType: UTType,
         lastModified: Date,
         creationDate: Date,
+        dateAdded: Date,
+        dateLastAccessed: Date = Date(),
         isHidden: Bool
     ) {
         self.isDirectory = isDirectory
+        self.isAppBundle = isAppBundle
         self.url = url
         self.name = name
         self.size = size
@@ -40,6 +48,9 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
         self.lastModified = lastModified
         self.creationDate = creationDate
         self.isHidden = isHidden
+        self.addedDate = dateAdded
+        self.dateLastAccessed = dateLastAccessed
+        
     }
 
     

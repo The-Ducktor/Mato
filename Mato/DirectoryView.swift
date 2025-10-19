@@ -14,9 +14,10 @@ struct DirectoryView: View {
     @State private var renameText = ""
     @State private var itemToRename: DirectoryItem?
 
-    @State private var sortOrder = [
-        KeyPathComparator(\DirectoryItem.creationDate, order: .reverse)
-    ]
+    @State private var sortOrder: [KeyPathComparator<DirectoryItem>] =
+        SettingsModel.keyPathComparator(
+            for: SettingsModel.shared.defaultSortMethod
+        )
 
     init(
         viewModel: DirectoryViewModel = DirectoryViewModel(),
@@ -50,11 +51,28 @@ struct DirectoryView: View {
                         selectedItems: $selectedItems,
                         sortOrder: $sortOrder
                     )
-                    .modifier(DirectoryContextMenu(viewModel: viewModel, ids: selectedItems, quickLookAction: openQuickLook))
+                    .modifier(
+                        DirectoryContextMenu(
+                            viewModel: viewModel,
+                            ids: selectedItems,
+                            quickLookAction: openQuickLook
+                        )
+                    )
                     .onChange(of: sortOrder) { _, newSortOrder in
                         applySorting(with: newSortOrder)
                     }
                     .onAppear {
+                        sortOrder = SettingsModel.keyPathComparator(
+                            for: SettingsModel.shared.defaultSortMethod
+                        )
+                        applySorting(with: sortOrder)
+                    }
+                    .onChange(of: SettingsModel.shared.defaultSortMethod) {
+                        _,
+                        newMethod in
+                        sortOrder = SettingsModel.keyPathComparator(
+                            for: newMethod
+                        )
                         applySorting(with: sortOrder)
                     }
                     .onChange(of: viewModel.currentDirectory) { _, _ in
@@ -67,7 +85,10 @@ struct DirectoryView: View {
                         onActivate?()
                     }
                     .onDrag(dragProvider)
-                    .onDrop(of: [UTType.fileURL], delegate: DirectoryDropDelegate(viewModel: viewModel))
+                    .onDrop(
+                        of: [UTType.fileURL],
+                        delegate: DirectoryDropDelegate(viewModel: viewModel)
+                    )
                     .onKeyPress(.space) {
                         handleSpaceKeyPress()
                         return .handled
@@ -107,14 +128,20 @@ struct DirectoryView: View {
 
         let provider = NSItemProvider()
 
-        provider.registerDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier, visibility: .all) { completion in
+        provider.registerDataRepresentation(
+            forTypeIdentifier: UTType.fileURL.identifier,
+            visibility: .all
+        ) { completion in
             do {
-                let data = try NSKeyedArchiver.archivedData(withRootObject: selectedURLs, requiringSecureCoding: false)
+                let data = try NSKeyedArchiver.archivedData(
+                    withRootObject: selectedURLs,
+                    requiringSecureCoding: false
+                )
                 completion(data, nil)
-                return nil // Return nil for the progress object
+                return nil  // Return nil for the progress object
             } catch {
                 completion(nil, error)
-                return nil // Return nil for the progress object
+                return nil  // Return nil for the progress object
             }
         }
         return provider
@@ -122,7 +149,9 @@ struct DirectoryView: View {
 
     // MARK: - Sorting Helper
 
-    private func applySorting(with sortOrder: [KeyPathComparator<DirectoryItem>]) {
+    private func applySorting(
+        with sortOrder: [KeyPathComparator<DirectoryItem>]
+    ) {
         DispatchQueue.main.async {
             viewModel.items.sort(using: sortOrder)
         }

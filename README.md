@@ -3,6 +3,8 @@
 
 A small, rough-around-the-edges macOS file manager that exists because I really, *really* don't like Finder.
 
+<img src="Assets/example-1.png"  alt="Dark Mode Preview">
+
 ## What is this?
 
 This is what happens when weekend frustration meets SwiftUI curiosity. **mato** is a minimal file manager I built not because I had revolutionary ideas about file management, but because using Finder makes me want to throw my laptop out the window.

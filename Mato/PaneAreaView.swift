@@ -1,4 +1,4 @@
-//
+
 //  PaneAreaView.swift
 //  Mato
 //
@@ -9,6 +9,14 @@ import SwiftUI
 
 struct PaneAreaView: View {
     @ObservedObject var paneManager: PaneManager
+
+    // Persist split positions using @AppStorage
+    @AppStorage("dualSplit") private var dualSplit: Double = 0.5
+    @AppStorage("tripleFirstSplit") private var tripleFirstSplit: Double = 0.33
+    @AppStorage("tripleSecondSplit") private var tripleSecondSplit: Double = 0.67
+    @AppStorage("quadVerticalSplit") private var quadVerticalSplit: Double = 0.5
+    @AppStorage("quadTopLeftWidth") private var quadTopLeftWidth: Double = 0.5
+    @AppStorage("quadBottomLeftWidth") private var quadBottomLeftWidth: Double = 0.5
     
     var body: some View {
         VStack(spacing: 0) {
@@ -28,13 +36,43 @@ struct PaneAreaView: View {
                     }
                     
                 case .dual:
-                    ResizableDualPaneView(paneManager: paneManager)
+                    ResizableDualPaneView(
+                        paneManager: paneManager,
+                        splitPosition: Binding(
+                            get: { dualSplit },
+                            set: { dualSplit = $0 }
+                        )
+                    )
                     
                 case .triple:
-                    ResizableTriplePaneView(paneManager: paneManager)
+                    ResizableTriplePaneView(
+                        paneManager: paneManager,
+                        firstSplit: Binding(
+                            get: { tripleFirstSplit },
+                            set: { tripleFirstSplit = $0 }
+                        ),
+                        secondSplit: Binding(
+                            get: { tripleSecondSplit },
+                            set: { tripleSecondSplit = $0 }
+                        )
+                    )
                     
                 case .quad:
-                    ResizableQuadPaneView(paneManager: paneManager)
+                    ResizableQuadPaneView(
+                        paneManager: paneManager,
+                        verticalSplit: Binding(
+                            get: { quadVerticalSplit },
+                            set: { quadVerticalSplit = $0 }
+                        ),
+                        topLeftWidth: Binding(
+                            get: { quadTopLeftWidth },
+                            set: { quadTopLeftWidth = $0 }
+                        ),
+                        bottomLeftWidth: Binding(
+                            get: { quadBottomLeftWidth },
+                            set: { quadBottomLeftWidth = $0 }
+                        )
+                    )
                 }
             } else {
                 Text("No panes available")
@@ -48,7 +86,7 @@ struct PaneAreaView: View {
 // MARK: - Resizable Dual Pane View
 struct ResizableDualPaneView: View {
     @ObservedObject var paneManager: PaneManager
-    @State private var splitPosition: CGFloat = 0.5
+    @Binding var splitPosition: Double
     
     var body: some View {
         GeometryReader { geometry in
@@ -94,8 +132,8 @@ struct ResizableDualPaneView: View {
 // MARK: - Resizable Triple Pane View
 struct ResizableTriplePaneView: View {
     @ObservedObject var paneManager: PaneManager
-    @State private var firstSplit: CGFloat = 0.33
-    @State private var secondSplit: CGFloat = 0.67
+    @Binding var firstSplit: Double
+    @Binding var secondSplit: Double
     
     var body: some View {
         GeometryReader { geometry in
@@ -148,9 +186,9 @@ struct ResizableTriplePaneView: View {
 // MARK: - Resizable Quad Pane View
 struct ResizableQuadPaneView: View {
     @ObservedObject var paneManager: PaneManager
-    @State private var verticalSplit: CGFloat = 0.5
-    @State private var topLeftWidth: CGFloat = 0.5
-    @State private var bottomLeftWidth: CGFloat = 0.5
+    @Binding var verticalSplit: Double
+    @Binding var topLeftWidth: Double
+    @Binding var bottomLeftWidth: Double
     
     var body: some View {
         GeometryReader { geometry in
@@ -248,59 +286,59 @@ struct NativeResizeHandle: View {
     let onDrag: (CGFloat) -> Void
     
     @State private var isDragging = false
-    @State private var lastLocation: CGFloat = 0
+    @State private var isHovering = false
     
     var body: some View {
-        Rectangle()
-            .fill(.separator)
-            .frame(
-                width: isVertical ? 1 : nil,
-                height: isVertical ? nil : 1
-            )
-            .background(
-                // Larger invisible drag area
+        ZStack {
+            // Visible separator line
+            Rectangle()
+                .fill(isDragging ? Color.accentColor : Color.secondary.opacity(0.3))
+                .frame(
+                    width: isVertical ? 1 : nil,
+                    height: isVertical ? nil : 1
+                )
+            
+            // Larger invisible hit area for easier grabbing
+            Rectangle()
+                .fill(.clear)
+                .frame(
+                    width: isVertical ? 10 : nil,
+                    height: isVertical ? nil : 10
+                )
+                .contentShape(Rectangle())
+            
+            // Visual feedback when hovering or dragging
+            if isHovering || isDragging {
                 Rectangle()
-                    .fill(.clear)
+                    .fill(Color.accentColor.opacity(isDragging ? 0.3 : 0.15))
                     .frame(
-                        width: isVertical ? 8 : nil,
-                        height: isVertical ? nil : 8
+                        width: isVertical ? 4 : nil,
+                        height: isVertical ? nil : 4
                     )
-                    .cursor(isVertical ? .resizeLeftRight : .resizeUpDown)
-            )
-            .overlay(
-                // Visual feedback only when dragging
-                Rectangle()
-                    .fill(isDragging ? .blue.opacity(0.5) : .clear)
-                    .frame(
-                        width: isVertical ? 3 : nil,
-                        height: isVertical ? nil : 3
-                    )
-            )
-            .gesture(
-                DragGesture(coordinateSpace: .global)
-                    .onChanged { value in
-                        let currentLocation = isVertical ? value.location.x : value.location.y
-                        
-                        if !isDragging {
-                            isDragging = true
-                            lastLocation = currentLocation
-                            return
-                        }
-                        
-                        // Calculate immediate delta
-                        let delta = currentLocation - lastLocation
-                        let deltaRatio = delta / containerSize
-                        
-                        // Apply change immediately without animation
-                        onDrag(deltaRatio)
-                        
-                        lastLocation = currentLocation
+            }
+        }
+        .cursor(isVertical ? .resizeLeftRight : .resizeUpDown)
+        .onHover { hovering in
+            isHovering = hovering
+        }
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if !isDragging {
+                        isDragging = true
                     }
-                    .onEnded { _ in
-                        isDragging = false
-                        lastLocation = 0
-                    }
-            )
+                    
+                    // Calculate delta based on translation
+                    let delta = isVertical ? value.translation.width : value.translation.height
+                    let deltaRatio = delta / containerSize
+                    
+                    // Apply change
+                    onDrag(deltaRatio)
+                }
+                .onEnded { _ in
+                    isDragging = false
+                }
+        )
     }
 }
 

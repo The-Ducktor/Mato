@@ -24,10 +24,12 @@ final class SimpleThumbnailLoader: ObservableObject {
     struct ThumbnailOptions: Sendable {
         let size: CGSize
         let scale: CGFloat
+        let maintainAspectRatio: Bool
         
-        init(size: CGSize = CGSize(width: 256, height: 256), scale: CGFloat = 2.0) {
+        init(size: CGSize = CGSize(width: 256, height: 256), scale: CGFloat = 2.0, maintainAspectRatio: Bool = true) {
             self.size = size
             self.scale = scale
+            self.maintainAspectRatio = maintainAspectRatio
         }
     }
     
@@ -69,6 +71,7 @@ final class SimpleThumbnailLoader: ObservableObject {
     
     private func generateQuickLookThumbnail(for url: URL, options: ThumbnailOptions) async throws -> NSImage {
         return try await withCheckedThrowingContinuation { continuation in
+            // Use .icon to prevent cropping and maintain aspect ratio
             let request = QLThumbnailGenerator.Request(
                 fileAt: url,
                 size: options.size,
@@ -77,9 +80,31 @@ final class SimpleThumbnailLoader: ObservableObject {
             )
             
             thumbnailGenerator.generateBestRepresentation(for: request) { representation, error in
+                // Extract Sendable data off-actor to avoid sending non-Sendable representation across actors
+                let cgImage = representation?.cgImage
+                let imageWidth = cgImage.map { CGFloat($0.width) }
+                let imageHeight = cgImage.map { CGFloat($0.height) }
+
                 Task { @MainActor in
-                    if let representation = representation {
-                        let nsImage = NSImage(cgImage: representation.cgImage, size: options.size)
+                    if let cgImage, let imageWidth, let imageHeight {
+                        // Calculate the final size to fit within bounds while maintaining aspect ratio
+                        let finalSize: CGSize
+                        if options.maintainAspectRatio {
+                            let aspectRatio = imageWidth / imageHeight
+                            let targetAspectRatio = options.size.width / options.size.height
+                            
+                            if aspectRatio > targetAspectRatio {
+                                // Image is wider - fit to width
+                                finalSize = CGSize(width: options.size.width, height: options.size.width / aspectRatio)
+                            } else {
+                                // Image is taller - fit to height
+                                finalSize = CGSize(width: options.size.height * aspectRatio, height: options.size.height)
+                            }
+                        } else {
+                            finalSize = CGSize(width: imageWidth, height: imageHeight)
+                        }
+                        
+                        let nsImage = NSImage(cgImage: cgImage, size: finalSize)
                         continuation.resume(returning: nsImage)
                     } else {
                         continuation.resume(throwing: error ?? ThumbnailError.thumbnailGenerationFailed)
@@ -99,3 +124,4 @@ final class SimpleThumbnailLoader: ObservableObject {
         imageCache.removeObject(forKey: url as NSURL)
     }
 }
+
