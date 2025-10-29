@@ -14,12 +14,16 @@ class DirectoryViewModel: ObservableObject {
     // Sorting and sortedItems are now managed reactively and debounced for UI safety.
     @Published var items: [DirectoryItem] = [] {
         didSet {
-            scheduleSortedItemsUpdate()
+            // Immediately update sortedItems when items change to prevent index out of bounds
+            updateSortedItems()
         }
     }
     @Published var sortedItems: [DirectoryItem] = []
     @Published var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod) {
-        didSet { scheduleSortedItemsUpdate() }
+        didSet { 
+            // Immediately update sortedItems when sort order changes
+            updateSortedItems()
+        }
     }
 
     @Published var currentDirectory: URL?
@@ -44,8 +48,9 @@ class DirectoryViewModel: ObservableObject {
 
     // Directory watching service
     private var directoryWatcherService: DirectoryWatcherService?
-
-    private var sortingWorkItem: DispatchWorkItem?
+    
+    // Flag to prevent concurrent sorting operations
+    private var isUpdatingSortedItems = false
 
     init() {
         // Use default folder from settings
@@ -53,7 +58,6 @@ class DirectoryViewModel: ObservableObject {
         currentDirectory = defaultURL
         navigationStack = [defaultURL]
         loadDirectory(at: defaultURL)
-        scheduleSortedItemsUpdate()
     }
 
     func loadDownloadsDirectory() {
@@ -116,23 +120,19 @@ class DirectoryViewModel: ObservableObject {
     }
 
     private func updateSortedItems() {
+        // Prevent concurrent sorting operations
+        guard !isUpdatingSortedItems else { return }
+        
+        isUpdatingSortedItems = true
+        defer { isUpdatingSortedItems = false }
+        
         sortedItems = items.sorted(using: sortOrder)
     }
 
-    private func scheduleSortedItemsUpdate() {
-        sortingWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.updateSortedItems()
-        }
-        sortingWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: workItem)
-    }
-
     func setSortOrder(_ newSortOrder: [KeyPathComparator<DirectoryItem>]) {
+        // Update happens automatically via didSet, but we set it explicitly here
+        // to be clear about the intent
         sortOrder = newSortOrder
-        // Immediately update sortedItems to prevent table crashes during sort changes
-        sortingWorkItem?.cancel()
-        updateSortedItems()
     }
 
     func openItem(_ item: DirectoryItem) {

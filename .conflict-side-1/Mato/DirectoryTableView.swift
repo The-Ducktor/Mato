@@ -20,6 +20,10 @@ struct DirectoryTableView: View {
     @State private var color: Color = .clear // testing
     @State private var isDropTargeted: Bool = false
     @State private var hoveredFolderID: DirectoryItem.ID? = nil
+    @State private var tableRebuildID = UUID() // Force table rebuild on sort changes
+    @State private var sortUpdateTask: Task<Void, Never>? = nil // Debounce sort updates
+    @State private var localSortOrder: [KeyPathComparator<DirectoryItem>] = [] // Local copy to prevent binding conflicts
+    @State private var isProcessingSortChange = false // Prevent re-entrant updates
     @SceneStorage("DirectoryTableViewConfig")
     private var columnCustomization: TableColumnCustomization<DirectoryItem>
 
@@ -27,7 +31,7 @@ struct DirectoryTableView: View {
         VStack(alignment: .leading, spacing: 0) {
             Table(
                 selection: $selectedItems,
-                sortOrder: $sortOrder,
+                sortOrder: $localSortOrder,
                 columnCustomization: $columnCustomization,
             ) {
                 TableColumn("Name", value: \.name) { item in
@@ -96,11 +100,50 @@ struct DirectoryTableView: View {
                         .draggable(makeDraggedFiles(for: item))
                 }
             }
-            .id(viewModel.currentDirectory) // Force rebuild on directory change for better performance
+            .id(tableRebuildID) // Force complete rebuild when this changes
+            .animation(.none, value: localSortOrder) // Disable animations on sort order changes to prevent crashes
             .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
-            .onChange(of: sortOrder) { oldValue, newValue in
-                // Update sort order immediately to prevent table crashes
-                viewModel.setSortOrder(newValue)
+            .onAppear {
+                // Initialize local sort order from binding
+                localSortOrder = sortOrder
+            }
+            .onChange(of: localSortOrder) { oldValue, newValue in
+                // Prevent re-entrant updates
+                guard !isProcessingSortChange else { return }
+                isProcessingSortChange = true
+                
+                // Cancel any pending sort update
+                sortUpdateTask?.cancel()
+                
+                // Immediately clear selection to prevent index issues
+                selectedItems.removeAll()
+                
+                // Update immediately - no delay needed since we're disabling animations
+                sortUpdateTask = Task { @MainActor in
+                    guard !Task.isCancelled else {
+                        isProcessingSortChange = false
+                        return
+                    }
+                    
+                    // Disable animations and update sort order immediately to prevent table crashes
+                    var transaction = Transaction()
+                    transaction.disablesAnimations = true
+                    withTransaction(transaction) {
+                        // Update the view model
+                        viewModel.setSortOrder(newValue)
+                        // Update the external binding
+                        sortOrder = newValue
+                        // Force complete table rebuild by changing the ID
+                        tableRebuildID = UUID()
+                    }
+                    
+                    isProcessingSortChange = false
+                }
+            }
+            .onChange(of: sortOrder) { _, newValue in
+                // Sync external changes back to local state (e.g., from settings)
+                guard !isProcessingSortChange else { return }
+                localSortOrder = newValue
             }
             .onChange(of: viewModel.currentDirectory) { _, _ in
                 // Clear selection when changing directories to prevent stale references
@@ -108,6 +151,8 @@ struct DirectoryTableView: View {
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
                     selectedItems.removeAll()
+                    // Force table rebuild on directory change
+                    tableRebuildID = UUID()
                 }
             }
         }
