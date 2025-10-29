@@ -1,3 +1,3 @@
-ancestorEntries = ["Mato.xcodeproj/project.pbxproj", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate"]
-ourEntries = ["Mato.xcodeproj/project.pbxproj", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate"]
-theirEntries = ["Mato.xcodeproj/project.pbxproj", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate"]
+ancestorEntries = ["Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/DirectoryView.swift"]
+ourEntries = ["Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/DirectoryView.swift"]
+theirEntries = ["Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/DirectoryView.swift"]

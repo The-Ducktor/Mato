@@ -15,12 +15,19 @@ struct ImageIcon: View {
                     .resizable()
                     
                     .aspectRatio(contentMode: .fit)
-                    .cornerRadius(2)
+                    .cornerRadius(3)
                     
                   
             } else if isLoading {
-                ProgressView()
-                    .scaleEffect(0.5)
+                ZStack {
+                    
+                    Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit).scaleEffect(0.5)
+                    ProgressView()
+                        .scaleEffect(0.4).aspectRatio(contentMode: .fit)
+                }
+               
             } else {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                     .resizable()
@@ -48,7 +55,12 @@ struct ImageIcon: View {
                 scale: 2.0,
                 maintainAspectRatio: true
             )
-            thumbnail = try await thumbnailLoader.generateThumbnail(for: item.url, options: options)
+            let loader = thumbnailLoader
+            let url = item.url
+            // Run thumbnail generation on background thread
+            thumbnail = try await Task.detached {
+                try await loader.generateThumbnail(for: url, options: options)
+            }.value
         } catch {
             // Fallback to system icon on error
             thumbnail = NSWorkspace.shared.icon(forFile: item.url.path)

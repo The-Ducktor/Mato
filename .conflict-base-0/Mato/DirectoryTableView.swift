@@ -58,6 +58,7 @@ struct DirectoryTableView: View {
                 .width(min: 100)
                 .alignment(.trailing)
                 .customizationID("size")
+                .customizationID("size")
 
                 TableColumn("Kind", value: \.fileTypeDescription) { item in
                     Text(item.fileTypeDescription)
@@ -68,6 +69,8 @@ struct DirectoryTableView: View {
                 TableColumn("Date Modified", value: \.lastModified) { item in
                     Text(formatDate(item.lastModified))
                 }
+                .customizationID("dateModified")
+                
                 .customizationID("dateModified")
                 
                 TableColumn("Date Created", value: \.creationDate) { item in
