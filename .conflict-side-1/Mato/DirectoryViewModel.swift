@@ -11,7 +11,17 @@ import UniformTypeIdentifiers
 
 @MainActor
 class DirectoryViewModel: ObservableObject {
-    @Published var items: [DirectoryItem] = []
+    // Sorting and sortedItems are now managed reactively and debounced for UI safety.
+    @Published var items: [DirectoryItem] = [] {
+        didSet {
+            scheduleSortedItemsUpdate()
+        }
+    }
+    @Published var sortedItems: [DirectoryItem] = []
+    @Published var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod) {
+        didSet { scheduleSortedItemsUpdate() }
+    }
+
     @Published var currentDirectory: URL?
     @Published var navigationStack: [URL] = []
     @Published var forwardStack: [URL] = []
@@ -35,12 +45,15 @@ class DirectoryViewModel: ObservableObject {
     // Directory watching service
     private var directoryWatcherService: DirectoryWatcherService?
 
+    private var sortingWorkItem: DispatchWorkItem?
+
     init() {
         // Use default folder from settings
         let defaultURL = SettingsModel.shared.defaultFolderURL
         currentDirectory = defaultURL
         navigationStack = [defaultURL]
         loadDirectory(at: defaultURL)
+        scheduleSortedItemsUpdate()
     }
 
     func loadDownloadsDirectory() {
@@ -84,12 +97,9 @@ class DirectoryViewModel: ObservableObject {
                 let filteredContents = shouldHideHiddenFiles ?
                 contents.filter { !($0.isHidden) } : contents
 
-                // sort by date newest first
-                let sortedContents = filteredContents.sorted { $0.lastModified > $1.lastModified }
-
                 // Set items directly, no sorting.
                 guard let self = self else { return }
-                self.items = sortedContents
+                self.items = filteredContents
                 self.isLoading = false
 
             } catch {
@@ -99,6 +109,23 @@ class DirectoryViewModel: ObservableObject {
                 self.isLoading = false
             }
         }
+    }
+
+    private func updateSortedItems() {
+        sortedItems = items.sorted(using: sortOrder)
+    }
+
+    private func scheduleSortedItemsUpdate() {
+        sortingWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.updateSortedItems()
+        }
+        sortingWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12, execute: workItem)
+    }
+
+    func setSortOrder(_ newSortOrder: [KeyPathComparator<DirectoryItem>]) {
+        sortOrder = newSortOrder
     }
 
     func openItem(_ item: DirectoryItem) {
@@ -578,3 +605,4 @@ class DirectoryViewModel: ObservableObject {
     // MARK: - Directory Watching
     // (All logic now handled by DirectoryWatcherService)
 }
+
