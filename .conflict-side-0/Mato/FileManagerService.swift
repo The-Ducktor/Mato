@@ -29,7 +29,8 @@ final class FileManagerService: @unchecked Sendable {
                 .creationDateKey
             ])
 
-            return contents.compactMap { url in
+            var items: [DirectoryItem] = []
+            for url in contents {
                 do {
                     let resourceValues = try url.resourceValues(forKeys: [
                         .isDirectoryKey,
@@ -42,12 +43,13 @@ final class FileManagerService: @unchecked Sendable {
                         .isApplicationKey,
                         .nameKey
                     ])
-                    return self.makeDirectoryItem(from: url, with: resourceValues)
+                    let item = self.makeDirectoryItem(from: url, with: resourceValues)
+                    items.append(item)
                 } catch {
                     print("Error getting attributes for \(url): \(error)")
-                    return nil
                 }
             }
+            return items
         }.value
     }
     

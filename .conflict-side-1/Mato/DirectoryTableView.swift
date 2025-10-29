@@ -52,7 +52,6 @@ struct DirectoryTableView: View {
                 .width(min: 100)
                 .alignment(.trailing)
                 .customizationID("size")
-                .customizationID("size")
 
                 TableColumn("Kind", value: \.fileTypeDescription) { item in
                     Text(item.fileTypeDescription)
@@ -63,8 +62,6 @@ struct DirectoryTableView: View {
                 TableColumn("Date Modified", value: \.lastModified) { item in
                     Text(formatDate(item.lastModified))
                 }
-                .customizationID("dateModified")
-                
                 .customizationID("dateModified")
                 
                 TableColumn("Date Created", value: \.creationDate) { item in
@@ -99,19 +96,33 @@ struct DirectoryTableView: View {
                         .draggable(makeDraggedFiles(for: item))
                 }
             }
+            .id(viewModel.currentDirectory) // Force rebuild on directory change for better performance
             .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
             .onChange(of: sortOrder) { oldValue, newValue in
                 // Update sort order immediately to prevent table crashes
                 viewModel.setSortOrder(newValue)
+            }
+            .onChange(of: viewModel.currentDirectory) { _, _ in
+                // Clear selection when changing directories to prevent stale references
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    selectedItems.removeAll()
+                }
             }
         }
     }
     
     private func makeDraggedFiles(for item: DirectoryItem) -> DraggedFiles {
         let urlsToDrag: [URL]
-        if selectedItems.contains(item.id) {
-            urlsToDrag = selectedItems.compactMap { id in
-                viewModel.sortedItems.first { $0.id == id }?.url
+        // Only compute URLs when drag actually happens
+        if selectedItems.contains(item.id), selectedItems.count > 1 {
+            // More efficient lookup for multiple selections
+            let selectedSet = selectedItems
+            urlsToDrag = viewModel.sortedItems.reduce(into: []) { result, current in
+                if selectedSet.contains(current.id) {
+                    result.append(current.url)
+                }
             }
         } else {
             urlsToDrag = [item.url]
@@ -161,19 +172,28 @@ struct DirectoryTableView: View {
     }
 
 
+    // Cache formatters to avoid recreating them for every cell
+    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+    
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+
     private func formatDate(_ date: Date) -> String {
         let now = Date()
         let calendar = Calendar.current
         
         if calendar.isDateInToday(date) || calendar.isDateInYesterday(date) || calendar.isDateInTomorrow(date) {
-            let relativeFormatter = RelativeDateTimeFormatter()
-            relativeFormatter.unitsStyle = .full
-            return relativeFormatter.localizedString(for: date, relativeTo: now)
+            return Self.relativeDateFormatter.localizedString(for: date, relativeTo: now)
         } else {
-            let formatter = DateFormatter()
-            formatter.dateStyle = .medium
-            formatter.timeStyle = .short
-            return formatter.string(from: date)
+            return Self.dateFormatter.string(from: date)
         }
     }
     
