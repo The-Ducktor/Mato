@@ -25,7 +25,7 @@ struct ImageIcon: View {
                         .resizable()
                         .aspectRatio(contentMode: .fit).scaleEffect(0.5)
                     ProgressView()
-                        .scaleEffect(0.4).aspectRatio(contentMode: .fit)
+                        .controlSize(.small)
                 }
                
             } else {
