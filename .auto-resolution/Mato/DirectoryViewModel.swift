@@ -71,6 +71,10 @@ class DirectoryViewModel: ObservableObject {
     func loadDirectory(at url: URL) {
         isLoading = true
         errorMessage = nil
+        
+        // Clear items immediately when changing directories to prevent showing stale data
+        items = []
+        sortedItems = []
 
         // Update path string
         pathString = url.path

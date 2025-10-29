@@ -14,10 +14,18 @@ struct DirectoryView: View {
     @State private var renameText = ""
     @State private var itemToRename: DirectoryItem?
 
+<<<<<<< ours
     @State private var sortOrder: [KeyPathComparator<DirectoryItem>] =
         SettingsModel.keyPathComparator(
             for: SettingsModel.shared.defaultSortMethod
         )
+||||||| ancestor
+    @State private var sortOrder = [
+        KeyPathComparator(\DirectoryItem.creationDate, order: .reverse)
+    ]
+=======
+    @State private var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod)
+>>>>>>> theirs
 
     init(
         viewModel: DirectoryViewModel = DirectoryViewModel(),
@@ -59,12 +67,24 @@ struct DirectoryView: View {
                         )
                     )
                     .onChange(of: sortOrder) { _, newSortOrder in
-                        applySorting(with: newSortOrder)
+                        viewModel.setSortOrder(newSortOrder)
                     }
                     .onAppear {
+<<<<<<< ours
                         sortOrder = SettingsModel.keyPathComparator(
                             for: SettingsModel.shared.defaultSortMethod
                         )
+                        viewModel.setSortOrder(sortOrder)
+                    }
+                    .onChange(of: SettingsModel.shared.defaultSortMethod) {
+                        _,
+                        newMethod in
+                        sortOrder = SettingsModel.keyPathComparator(
+                            for: newMethod
+                        )
+||||||| ancestor
+=======
+                        sortOrder = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod)
                         applySorting(with: sortOrder)
                     }
                     .onChange(of: SettingsModel.shared.defaultSortMethod) {
@@ -73,13 +93,11 @@ struct DirectoryView: View {
                         sortOrder = SettingsModel.keyPathComparator(
                             for: newMethod
                         )
+>>>>>>> theirs
                         applySorting(with: sortOrder)
                     }
                     .onChange(of: viewModel.currentDirectory) { _, _ in
-                        applySorting(with: sortOrder)
-                    }
-                    .onChange(of: viewModel.items) { _, _ in
-                        applySorting(with: sortOrder)
+                        // Sorting is handled by the view model
                     }
                     .onChange(of: selectedItems) {
                         onActivate?()
@@ -131,7 +149,7 @@ struct DirectoryView: View {
 
     private func dragProvider() -> NSItemProvider {
         let selectedURLs = selectedItems.compactMap { id in
-            viewModel.items.first { $0.id == id }?.url
+            viewModel.sortedItems.first { $0.id == id }?.url
         }
 
         guard !selectedURLs.isEmpty else { return NSItemProvider() }
@@ -158,18 +176,11 @@ struct DirectoryView: View {
     }
 
     // MARK: - Sorting Helper
-
-    private func applySorting(
-        with sortOrder: [KeyPathComparator<DirectoryItem>]
-    ) {
-        DispatchQueue.main.async {
-            viewModel.items.sort(using: sortOrder)
-        }
-    }
+    // Sorting is now handled by DirectoryViewModel
 
     private var selectedItemURLs: [URL] {
         selectedItems.compactMap { id in
-            viewModel.items.first { $0.id == id }?.url
+            viewModel.sortedItems.first { $0.id == id }?.url
         }
     }
 
@@ -177,7 +188,7 @@ struct DirectoryView: View {
 
     private func handleSpaceKeyPress() {
         guard let firstSelectedId = selectedItems.first,
-            let selectedItem = viewModel.items.first(where: {
+            let selectedItem = viewModel.sortedItems.first(where: {
                 $0.id == firstSelectedId
             })
         else {
