@@ -5,16 +5,10 @@ struct DraggedFiles: Transferable {
     let urls: [URL]
 
     static var transferRepresentation: some TransferRepresentation {
-        // Single URL representation for broad compatibility
+        // Provide a simple single-URL representation
         DataRepresentation(exportedContentType: .fileURL) { dragged in
-            if let first = dragged.urls.first {
-                return try NSKeyedArchiver.archivedData(withRootObject: first, requiringSecureCoding: false)
-            }
-            return Data()
-        }
-        // Multi-URL representation to support dragging multiple files
-        DataRepresentation(exportedContentType: .fileURL) { dragged in
-            return try NSKeyedArchiver.archivedData(withRootObject: dragged.urls, requiringSecureCoding: false)
+            guard let first = dragged.urls.first else { return Data() }
+            return try NSKeyedArchiver.archivedData(withRootObject: first as NSURL, requiringSecureCoding: false)
         }
     }
 }
@@ -97,24 +91,31 @@ struct DirectoryTableView: View {
                 .customizationID("dateLastAccessed")
                 .defaultVisibility(.hidden)
             } rows: {
-                ForEach(viewModel.items) { item in
+                ForEach(viewModel.sortedItems) { item in
                     TableRow(item)
-                        .draggable({
-                            let urlsToDrag: [URL]
-                            if selectedItems.contains(item.id) {
-                                urlsToDrag = selectedItems.compactMap { id in
-                                    viewModel.items.first { $0.id == id }?.url
-                                }
-                            } else {
-                                urlsToDrag = [item.url]
-                            }
-                            return DraggedFiles(urls: urlsToDrag)
-                        }())
+                        .draggable(makeDraggedFiles(for: item))
                 }
             }
             .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
+            .onChange(of: sortOrder) { oldValue, newValue in
+                // Update sort order immediately to prevent table crashes
+                viewModel.setSortOrder(newValue)
+            }
         }
     }
+    
+    private func makeDraggedFiles(for item: DirectoryItem) -> DraggedFiles {
+        let urlsToDrag: [URL]
+        if selectedItems.contains(item.id) {
+            urlsToDrag = selectedItems.compactMap { id in
+                viewModel.sortedItems.first { $0.id == id }?.url
+            }
+        } else {
+            urlsToDrag = [item.url]
+        }
+        return DraggedFiles(urls: urlsToDrag)
+    }
+
     private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in

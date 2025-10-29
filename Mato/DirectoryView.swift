@@ -59,13 +59,13 @@ struct DirectoryView: View {
                         )
                     )
                     .onChange(of: sortOrder) { _, newSortOrder in
-                        applySorting(with: newSortOrder)
+                        viewModel.setSortOrder(newSortOrder)
                     }
                     .onAppear {
                         sortOrder = SettingsModel.keyPathComparator(
                             for: SettingsModel.shared.defaultSortMethod
                         )
-                        applySorting(with: sortOrder)
+                        viewModel.setSortOrder(sortOrder)
                     }
                     .onChange(of: SettingsModel.shared.defaultSortMethod) {
                         _,
@@ -73,13 +73,10 @@ struct DirectoryView: View {
                         sortOrder = SettingsModel.keyPathComparator(
                             for: newMethod
                         )
-                        applySorting(with: sortOrder)
+                        viewModel.setSortOrder(sortOrder)
                     }
                     .onChange(of: viewModel.currentDirectory) { _, _ in
-                        applySorting(with: sortOrder)
-                    }
-                    .onChange(of: viewModel.items) { _, _ in
-                        applySorting(with: sortOrder)
+                        // Sorting is handled by the view model
                     }
                     .onChange(of: selectedItems) {
                         onActivate?()
@@ -131,7 +128,7 @@ struct DirectoryView: View {
 
     private func dragProvider() -> NSItemProvider {
         let selectedURLs = selectedItems.compactMap { id in
-            viewModel.items.first { $0.id == id }?.url
+            viewModel.sortedItems.first { $0.id == id }?.url
         }
 
         guard !selectedURLs.isEmpty else { return NSItemProvider() }
@@ -158,18 +155,11 @@ struct DirectoryView: View {
     }
 
     // MARK: - Sorting Helper
-
-    private func applySorting(
-        with sortOrder: [KeyPathComparator<DirectoryItem>]
-    ) {
-        DispatchQueue.main.async {
-            viewModel.items.sort(using: sortOrder)
-        }
-    }
+    // Sorting is now handled by DirectoryViewModel
 
     private var selectedItemURLs: [URL] {
         selectedItems.compactMap { id in
-            viewModel.items.first { $0.id == id }?.url
+            viewModel.sortedItems.first { $0.id == id }?.url
         }
     }
 
@@ -177,7 +167,7 @@ struct DirectoryView: View {
 
     private func handleSpaceKeyPress() {
         guard let firstSelectedId = selectedItems.first,
-            let selectedItem = viewModel.items.first(where: {
+            let selectedItem = viewModel.sortedItems.first(where: {
                 $0.id == firstSelectedId
             })
         else {
