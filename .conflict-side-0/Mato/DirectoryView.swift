@@ -119,6 +119,16 @@ struct DirectoryView: View {
         } message: {
             Text("Enter a new name for the item")
         }
+        .alert("Replace Files?", isPresented: $viewModel.showingFileConflictAlert) {
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelReplaceFiles()
+            }
+            Button("Replace") {
+                viewModel.confirmReplaceFiles()
+            }
+        } message: {
+            Text(viewModel.conflictMessage)
+        }
     }
 
     // MARK: - Drag and Drop
