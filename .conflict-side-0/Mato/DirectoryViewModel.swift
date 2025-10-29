@@ -24,6 +24,11 @@ class DirectoryViewModel: ObservableObject {
     @Published var showingRenameAlert = false
     @Published var renameText = ""
     @Published var itemToRename: DirectoryItem? = nil
+    
+    // File conflict alert state
+    @Published var showingFileConflictAlert = false
+    @Published var conflictMessage = ""
+    private var pendingMoveOperation: (() -> Void)?
 
     private let fileManager = FileManagerService.shared
 
@@ -447,17 +452,105 @@ class DirectoryViewModel: ObservableObject {
         }
     }
 
-    func moveFiles(from sourceURLs: [URL], to destinationURL: URL) {
+    func moveFiles(from sourceURLs: [URL], to destinationURL: URL, replaceExisting: Bool = false) {
         Task {
-            do {
-                for sourceURL in sourceURLs {
-                    try await fileManager.moveFile(from: sourceURL, to: destinationURL)
+            print("🔍 DEBUG: Moving \(sourceURLs.count) files to \(destinationURL.path)")
+            for (index, url) in sourceURLs.enumerated() {
+                print("  [\(index)] Source: \(url.lastPathComponent) from \(url.path)")
+            }
+            
+            var successCount = 0
+            var conflictingFiles: [(source: URL, dest: URL)] = []
+            var failedFiles: [(source: String, dest: String, error: String)] = []
+            
+            // First pass: check for conflicts
+            for sourceURL in sourceURLs {
+                let fileName = sourceURL.lastPathComponent
+                let destinationPath = destinationURL.appendingPathComponent(fileName)
+                
+                if FileManager.default.fileExists(atPath: destinationPath.path) && !replaceExisting {
+                    print("⚠️ Conflict detected: \(fileName) already exists at \(destinationPath.path)")
+                    conflictingFiles.append((sourceURL, destinationPath))
                 }
-                refreshCurrentDirectory()
-            } catch {
-                errorMessage = "Error moving files: \(error.localizedDescription)"
+            }
+            
+            // If there are conflicts and we haven't been told to replace, show confirmation
+            if !conflictingFiles.isEmpty && !replaceExisting {
+                let fileNames = conflictingFiles.map { $0.source.lastPathComponent }
+                if fileNames.count == 1 {
+                    conflictMessage = "'\(fileNames[0])' already exists. Do you want to replace it?"
+                } else {
+                    conflictMessage = "\(fileNames.count) files already exist. Do you want to replace them?"
+                }
+                
+                // Store the operation to retry with replace=true if user confirms
+                pendingMoveOperation = { [weak self] in
+                    self?.moveFiles(from: sourceURLs, to: destinationURL, replaceExisting: true)
+                }
+                
+                showingFileConflictAlert = true
+                return
+            }
+            
+            // Second pass: perform the moves
+            for sourceURL in sourceURLs {
+                let fileName = sourceURL.lastPathComponent
+                let destinationPath = destinationURL.appendingPathComponent(fileName)
+                
+                print("📦 Attempting to move: \(fileName)")
+                print("   From: \(sourceURL.path)")
+                print("   To: \(destinationPath.path)")
+                
+                do {
+                    // If file exists and we're replacing, delete it first
+                    if FileManager.default.fileExists(atPath: destinationPath.path) && replaceExisting {
+                        print("🗑️ Removing existing file at destination")
+                        try FileManager.default.removeItem(at: destinationPath)
+                    }
+                    
+                    try await fileManager.moveFile(from: sourceURL, to: destinationURL)
+                    print("✅ Successfully moved: \(fileName)")
+                    successCount += 1
+                } catch {
+                    print("❌ Failed to move \(fileName): \(error.localizedDescription)")
+                    failedFiles.append((sourceURL.path, destinationPath.path, error.localizedDescription))
+                }
+            }
+            
+            refreshCurrentDirectory()
+            
+            // Show appropriate message based on results
+            if successCount == sourceURLs.count {
+                errorMessage = nil
+            } else if successCount > 0 {
+                var message = "Moved \(successCount) of \(sourceURLs.count) files."
+                if !failedFiles.isEmpty {
+                    // Group by destination to avoid showing duplicate filenames
+                    let uniqueFailures = Dictionary(grouping: failedFiles, by: { $0.dest })
+                        .map { URL(fileURLWithPath: $0.key).lastPathComponent }
+                    message += " Failed: \(uniqueFailures.joined(separator: ", "))."
+                }
+                errorMessage = message
+            } else if !failedFiles.isEmpty {
+                // Show source -> destination mapping for clarity
+                let details = failedFiles.map {
+                    "'\(URL(fileURLWithPath: $0.source).lastPathComponent)' → '\(URL(fileURLWithPath: $0.dest).lastPathComponent)'"
+                }
+                errorMessage = "Failed to move files: \(details.joined(separator: ", "))"
             }
         }
+    }
+    
+    func confirmReplaceFiles() {
+        showingFileConflictAlert = false
+        pendingMoveOperation?()
+        pendingMoveOperation = nil
+    }
+    
+    func cancelReplaceFiles() {
+        showingFileConflictAlert = false
+        pendingMoveOperation = nil
+        errorMessage = "Move operation cancelled."
     }
 
     func handleDrop(info: DropInfo) -> Bool {
