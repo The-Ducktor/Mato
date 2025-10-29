@@ -126,6 +126,9 @@ class DirectoryViewModel: ObservableObject {
 
     func setSortOrder(_ newSortOrder: [KeyPathComparator<DirectoryItem>]) {
         sortOrder = newSortOrder
+        // Immediately update sortedItems to prevent table crashes during sort changes
+        sortingWorkItem?.cancel()
+        updateSortedItems()
     }
 
     func openItem(_ item: DirectoryItem) {
