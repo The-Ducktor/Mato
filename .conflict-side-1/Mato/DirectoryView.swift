@@ -15,6 +15,7 @@ struct DirectoryView: View {
     @State private var showingRenameAlert = false
     @State private var renameText = ""
     @State private var itemToRename: DirectoryItem?
+    @ObservedObject private var settings = SettingsModel.shared
 
 <<<<<<< ours
     @State private var sortOrder: [KeyPathComparator<DirectoryItem>] =
@@ -56,11 +57,21 @@ struct DirectoryView: View {
                         onActivate?()
                     }
                 } else {
-                    DirectoryTableView(
-                        viewModel: viewModel,
-                        selectedItems: $selectedItems,
-                        sortOrder: $sortOrder
-                    )
+                    Group {
+                        if settings.viewMode == "grid" {
+                            DirectoryGridView(
+                                viewModel: viewModel,
+                                selectedItems: $selectedItems,
+                                sortOrder: $sortOrder
+                            )
+                        } else {
+                            DirectoryTableView(
+                                viewModel: viewModel,
+                                selectedItems: $selectedItems,
+                                sortOrder: $sortOrder
+                            )
+                        }
+                    }
                     .modifier(
                         DirectoryContextMenu(
                             viewModel: viewModel,
