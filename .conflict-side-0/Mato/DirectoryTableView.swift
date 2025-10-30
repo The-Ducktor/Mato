@@ -5,10 +5,10 @@ struct DraggedFiles: Transferable {
     let urls: [URL]
 
     static var transferRepresentation: some TransferRepresentation {
-        // Provide a simple single-URL representation
+        // Provide all URLs for multi-select support
         DataRepresentation(exportedContentType: .fileURL) { dragged in
-            guard let first = dragged.urls.first else { return Data() }
-            return try NSKeyedArchiver.archivedData(withRootObject: first as NSURL, requiringSecureCoding: false)
+            // Archive all URLs together for multi-select drag support
+            return try NSKeyedArchiver.archivedData(withRootObject: dragged.urls as NSArray, requiringSecureCoding: false)
         }
     }
 }
