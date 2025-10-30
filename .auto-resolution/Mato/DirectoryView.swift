@@ -3,6 +3,8 @@ import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 
+
+
 struct DirectoryView: View {
     @ObservedObject var viewModel: DirectoryViewModel
     var onActivate: (() -> Void)? = nil
