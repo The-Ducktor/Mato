@@ -96,7 +96,7 @@ struct GridItemView: View {
     @State private var isDropTargeted = false
     
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: 4) {
             // Icon
             ImageIcon(item: .constant(item))
                 .frame(width: 64, height: 64)
@@ -107,18 +107,15 @@ struct GridItemView: View {
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .truncationMode(.middle)
-                .frame(height: 32)
+                .frame(height: 20)
         }
-        .frame(width: 100, height: 110)
-        .padding(8)
+        .frame(width: 100, height: 100)
+        .padding(2)
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(backgroundFill)
         )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(borderColor, lineWidth: isSelected ? 2 : 0)
-        )
+        
         .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) { providers in
             guard item.isDirectory else { return false }
             
@@ -150,9 +147,9 @@ struct GridItemView: View {
         if isDropTargeted && item.isDirectory {
             return Color.accentColor.opacity(0.25)
         } else if isSelected {
-            return Color.accentColor.opacity(0.15)
+            return Color.primary.opacity(0.15)
         } else if isHovered {
-            return Color.primary.opacity(0.05)
+            return Color.accentColor.opacity(0.05)
         } else {
             return Color.clear
         }
