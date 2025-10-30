@@ -110,6 +110,25 @@ struct SearchBar: View {
     }
 }
 
+// MARK: - View Mode Toggle
+struct ViewModeToggle: View {
+    @ObservedObject private var settings = SettingsModel.shared
+    
+    var body: some View {
+        Picker("View Mode", selection: $settings.viewMode) {
+            Image(systemName: "list.bullet")
+                .tag("list")
+                .help("List View")
+            Image(systemName: "square.grid.2x2")
+                .tag("grid")
+                .help("Grid View")
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 80)
+        .help("Change View Mode")
+    }
+}
+
 // MARK: - Pane Indicator
 struct PaneIndicator: View {
     let activeIndex: Int
