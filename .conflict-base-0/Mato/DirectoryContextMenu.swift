@@ -1,10 +1,9 @@
-
 import SwiftUI
 
 struct DirectoryContextMenuItems: View {
     @ObservedObject var viewModel: DirectoryViewModel
     let ids: Set<DirectoryItem.ID>
-    let quickLookAction: (URL) -> Void
+    let quickLookAction: ((URL) -> Void)?
     
     var body: some View {
         // Primary Actions Group
@@ -70,11 +69,13 @@ struct DirectoryContextMenuItems: View {
         // View Actions Group
         Group {
             Button("Quick Look") {
-                if let firstId = ids.first, let item = viewModel.getItem(firstId) {
-                    quickLookAction(item.url)
+                if let firstId = ids.first,
+                   let item = viewModel.getItem(firstId),
+                   let action = quickLookAction {
+                    action(item.url)
                 }
             }
-            .disabled(ids.isEmpty)
+            .disabled(ids.isEmpty || quickLookAction == nil)
 
             Button("Show in Finder") {
                 viewModel.showInFinder(ids)
