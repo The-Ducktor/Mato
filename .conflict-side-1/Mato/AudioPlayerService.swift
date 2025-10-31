@@ -15,8 +15,11 @@ class AudioPlayerService: ObservableObject {
     
     @Published var currentlyPlayingURL: URL?
     @Published var isPlaying: Bool = false
+    @Published var currentTime: TimeInterval = 0
+    @Published var duration: TimeInterval = 0
     
     private var audioPlayer: AVAudioPlayer?
+    private var progressTimer: Timer?
     
     private init() {}
     
@@ -70,6 +73,11 @@ class AudioPlayerService: ObservableObject {
             
             currentlyPlayingURL = url
             isPlaying = true
+            duration = audioPlayer?.duration ?? 0
+            currentTime = 0
+            
+            // Start progress timer
+            startProgressTimer()
             
             // Set up completion handler
             audioPlayer?.delegate = AudioPlayerDelegate.shared
@@ -88,14 +96,35 @@ class AudioPlayerService: ObservableObject {
     private func pause() {
         audioPlayer?.pause()
         isPlaying = false
+        stopProgressTimer()
     }
     
     /// Stop and clear current playback
     func stop() {
+        stopProgressTimer()
         audioPlayer?.stop()
         audioPlayer = nil
         currentlyPlayingURL = nil
         isPlaying = false
+        currentTime = 0
+        duration = 0
+    }
+    
+    /// Start the progress timer
+    private func startProgressTimer() {
+        stopProgressTimer()
+        progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self = self, let player = self.audioPlayer else { return }
+                self.currentTime = player.currentTime
+            }
+        }
+    }
+    
+    /// Stop the progress timer
+    private func stopProgressTimer() {
+        progressTimer?.invalidate()
+        progressTimer = nil
     }
 }
 
