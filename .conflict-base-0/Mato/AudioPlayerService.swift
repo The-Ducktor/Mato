@@ -42,14 +42,20 @@ class AudioPlayerService: ObservableObject {
     
     /// Play or pause audio file
     func togglePlayback(for url: URL) {
-        // If currently playing this file, pause it
-        if currentlyPlayingURL == url && isPlaying {
-            pause()
+        // If this is the current file (playing or paused)
+        if currentlyPlayingURL == url {
+            if isPlaying {
+                // Pause it
+                pause()
+            } else {
+                // Resume playback
+                resume()
+            }
             return
         }
         
-        // If currently playing a different file, stop it first
-        if currentlyPlayingURL != url {
+        // If currently playing/paused a different file, stop it first
+        if currentlyPlayingURL != nil {
             stop()
         }
         
@@ -96,7 +102,16 @@ class AudioPlayerService: ObservableObject {
     private func pause() {
         audioPlayer?.pause()
         isPlaying = false
-        stopProgressTimer()
+        // Keep timer running to maintain current time
+        // Don't stop the timer so progress persists
+    }
+    
+    /// Resume playback from paused state
+    private func resume() {
+        guard let player = audioPlayer else { return }
+        player.play()
+        isPlaying = true
+        startProgressTimer()
     }
     
     /// Stop and clear current playback
