@@ -3,7 +3,8 @@
 
 A small, rough-around-the-edges macOS file manager that exists because I really, *really* don't like Finder.
 
-<img src="Assets/example-1.png"  alt="Dark Mode Preview">
+<img src="Assets/example-1.png" alt="Dark Mode Preview">
+<img src="Assets/example-2.png" alt="Light Mode Preview">
 
 ## What is this?
 
@@ -13,10 +14,20 @@ It's a sketch of a file manager — functional enough to browse files without wa
 
 ## What it does
 
-- Multi-pane browsing (because tabs are for websites)
-- Address bar (revolutionary, I know)
-- Clean, minimal interface (mostly because I ran out of weekend)
-- Basic file operations (the ones that actually work)
+- **Multi-pane browsing** (1-4 panes, because tabs are for websites)
+- **Smart address bar** with editable path and breadcrumb navigation
+- **Dual view modes**: Grid view with thumbnails or detailed table view
+- **Sidebar navigation** with quick access, pinned folders, and pane switching
+- **File operations**: Copy, move, rename, delete, create new folders
+- **Media playback**: Built-in audio/video player for quick previews
+- **QuickLook integration**: Space bar to preview files
+- **Drag & drop support**: Move files between panes or to folders
+- **Directory watching**: Auto-refresh when files change
+- **Thumbnail generation**: Visual previews for images and documents
+- **Customizable settings**: Default folder, pane count, sort methods
+- **Keyboard navigation**: Back/forward history, focus management
+- **Clean, minimal interface** (mostly because I ran out of weekend)
+- **Light and dark mode** support
 - Exists as an alternative to Finder (the bar was not high)
 
 ## What it doesn't do
