@@ -250,17 +250,28 @@ struct GridItemView: View {
 
     @StateObject private var audioPlayer = AudioPlayerService.shared
     @State private var isDropTargeted = false
+    @State private var showProgressRing = false
+    @State private var isPressed = false
+    @State private var optimisticPlayState: Bool?
 
     private var isPlayable: Bool {
         audioPlayer.isPlayableMedia(item)
     }
 
     private var isCurrentlyPlaying: Bool {
-        audioPlayer.currentlyPlayingURL == item.url && audioPlayer.isPlaying
+        // Use optimistic state if available, otherwise use actual state
+        if let optimistic = optimisticPlayState {
+            return audioPlayer.currentlyPlayingURL == item.url && optimistic
+        }
+        return audioPlayer.currentlyPlayingURL == item.url && audioPlayer.isPlaying
+    }
+    
+    private var isCurrentFile: Bool {
+        audioPlayer.currentlyPlayingURL == item.url
     }
     
     private var progressValue: CGFloat {
-        guard isCurrentlyPlaying,
+        guard isCurrentFile,
               audioPlayer.duration > 0 else {
             return 0
         }
@@ -275,20 +286,36 @@ struct GridItemView: View {
                     .frame(width: 64, height: 64)
 
                 // Show play/pause button for playable media
-                if isPlayable && (isHovered || isCurrentlyPlaying) {
+                if isPlayable && (isHovered || isCurrentFile) {
                     Button(action: {
+                        // Optimistic update - immediately flip the state
+                        if isCurrentFile {
+                            optimisticPlayState = !audioPlayer.isPlaying
+                        } else {
+                            optimisticPlayState = true
+                        }
+                        
+                        // Clear optimistic state after a short delay
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            optimisticPlayState = nil
+                        }
+                        
                         audioPlayer.togglePlayback(for: item.url)
                     }) {
                         ZStack {
-                            // Progress ring
-                            if isCurrentlyPlaying {
+                            // Progress ring (show for current file, whether playing or paused)
+                            if isCurrentFile && showProgressRing {
+                                // Background ring
                                 Circle()
                                     .stroke(
                                         Color.white.opacity(0.3),
                                         lineWidth: 2.5
                                     )
                                     .frame(width: 32, height: 32)
+                                    .scaleEffect(showProgressRing ? 1.0 : 0.0)
+                                    .opacity(showProgressRing ? 1.0 : 0.0)
                                 
+                                // Progress ring
                                 Circle()
                                     .trim(from: 0, to: progressValue)
                                     .stroke(
@@ -300,12 +327,14 @@ struct GridItemView: View {
                                     )
                                     .frame(width: 32, height: 32)
                                     .rotationEffect(.degrees(-90))
-                                    .animation(.linear(duration: 0.1), value: progressValue)
+                                    .scaleEffect(showProgressRing ? 1.0 : 0.0)
+                                    .opacity(showProgressRing ? 1.0 : 0.0)
                             }
                             
                             // Background circle
                             Circle()
                                 .frame(width: 28, height: 28).glassEffect()
+                                .scaleEffect(isPressed ? 0.9 : 1.0)
 
                             // Play or pause icon
                             Image(
@@ -314,7 +343,9 @@ struct GridItemView: View {
                             )
                             .font(.system(size: 14))
                             .foregroundColor(.white)
-                            .offset(x: isCurrentlyPlaying ? 0 : 1)  // Slight offset for play icon to center it visually
+                            .offset(x: isCurrentlyPlaying ? 0 : 1)
+                            .scaleEffect(isPressed ? 0.85 : 1.0)
+                            .contentTransition(.symbolEffect(.replace))
                         }
                         .shadow(
                             color: .black.opacity(0.3),
@@ -322,10 +353,32 @@ struct GridItemView: View {
                             x: 0,
                             y: 1
                         )
+                        .animation(.spring(response: 0.2, dampingFraction: 0.8), value: isPressed)
+                        .animation(.spring(response: 0.25, dampingFraction: 0.7), value: showProgressRing)
+                        .animation(.linear(duration: 0.05), value: progressValue)
                     }
                     .buttonStyle(.plain)
                     .allowsHitTesting(true)
+                    .simultaneousGesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in
+                                if !isPressed {
+                                    isPressed = true
+                                }
+                            }
+                            .onEnded { _ in
+                                isPressed = false
+                            }
+                    )
                 }
+            }
+            .onChange(of: isCurrentFile) { _, isCurrent in
+                withAnimation {
+                    showProgressRing = isCurrent
+                }
+            }
+            .onAppear {
+                showProgressRing = isCurrentFile
             }
 
             // Name
