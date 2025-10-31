@@ -398,6 +398,11 @@ struct ModernPanelPreview: View {
 =======
 // SettingsView.swift
 // Settings window UI
+||||||| ancestor
+// SettingsView.swift
+// Settings window UI
+=======
+>>>>>>> theirs
 import SwiftUI
 
 struct SettingsView: View {

@@ -1,3 +1,3 @@
-ancestorEntries = [".conflict-side-1/Mato.xcodeproj/project.pbxproj", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/SettingsView.swift"]
-ourEntries = [".conflict-side-1/Mato.xcodeproj/project.pbxproj", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/SettingsView.swift"]
-theirEntries = [".conflict-side-1/Mato.xcodeproj/project.pbxproj", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/SettingsView.swift"]
+ancestorEntries = [".DS_Store", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/SettingsView.swift"]
+ourEntries = [".DS_Store", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/SettingsView.swift"]
+theirEntries = [".DS_Store", "Mato.xcodeproj/project.xcworkspace/xcuserdata/jacks.xcuserdatad/UserInterfaceState.xcuserstate", "Mato/SettingsView.swift"]
