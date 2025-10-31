@@ -93,12 +93,6 @@ struct DirectoryGridView: View {
                 selectedItems.removeAll()
             }
         }
-        .onChange(of: viewModel.sortedItems) { _, _ in
-            // Update focus when items change to prevent desync
-            DispatchQueue.main.async {
-                isFocused = true
-            }
-        }
         .focusable()
         .focused($isFocused)
         .onAppear {
@@ -400,75 +394,13 @@ struct GridItemView: View {
                 .fill(backgroundFill)
         )
         .contextMenu {
-            Button("Open") {
-                viewModel.openItem(item)
-            }
-
-            Button("Open in Terminal") {
-                viewModel.openInTerminal([item.id])
-            }
-            .disabled(!item.isDirectory)
-
-            Divider()
-
-            Button("Copy") {
-                viewModel.copyItems([item.id])
-            }
-
-            Button("Cut") {
-                viewModel.cutItems([item.id])
-            }
-
-            if viewModel.hasItemsInPasteboard() {
-                Button("Paste") {
-                    viewModel.pasteItems()
+            DirectoryContextMenuItems(
+                viewModel: viewModel,
+                ids: [item.id],
+                quickLookAction: { url in
+                    quickLookAction?(url)
                 }
-            }
-
-            Divider()
-
-            Button("Copy Path") {
-                viewModel.copyPaths([item.id])
-            }
-
-            Button("Copy as Pathname") {
-                viewModel.copyAsPathname([item.id])
-            }
-
-            Divider()
-
-            Button("Quick Look") {
-                quickLookAction?(item.url)
-            }
-
-            Button("Show in Finder") {
-                viewModel.showInFinder([item.id])
-            }
-
-            if item.url.pathExtension.lowercased().contains("app") || item.isDirectory {
-                Button("Show Package Contents") {
-                    viewModel.showPackageContents(item)
-                }
-            }
-
-            Divider()
-
-            if viewModel.canCompress([item.id]) {
-                Button("Compress \"\(item.name)\"") {
-                    viewModel.compressItems([item.id])
-                }
-            }
-
-            if viewModel.canCreateAlias([item.id]) {
-                Button("Make Alias") {
-                    viewModel.makeAlias([item.id])
-                }
-            }
-
-            Button("Move to Trash") {
-                viewModel.moveToTrash([item.id])
-            }
-            .foregroundColor(.red)
+            )
         }
         .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) {
             providers in
