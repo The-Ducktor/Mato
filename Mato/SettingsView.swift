@@ -55,6 +55,7 @@ struct SettingsView: View {
                             .controlSize(.regular)
                         }
                     }
+                   
                     
                     // Folder Selection Card
                     SettingsCard(
