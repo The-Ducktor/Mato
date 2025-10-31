@@ -132,9 +132,11 @@ struct PaneRow: View {
                         .frame(width: 8, height: 8)
                     Text("Pane \(index + 1)")
                     Spacer()
-                    Text(paneManager.panes[index].currentDirectory?.lastPathComponent ?? "No folder")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    if index < paneManager.panes.count {
+                        Text(paneManager.panes[index].currentDirectory?.lastPathComponent ?? "No folder")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .buttonStyle(.plain)
@@ -169,7 +171,9 @@ struct PaneRow: View {
             guard let draggedString = items.first,
                   draggedString.hasPrefix("pane_"),
                   let draggedIndex = Int(draggedString.replacingOccurrences(of: "pane_", with: "")),
-                  draggedIndex != index else {
+                  draggedIndex != index,
+                  draggedIndex < paneManager.panes.count,
+                  index < paneManager.panes.count else {
                 draggedPaneIndex = nil
                 return false
             }
