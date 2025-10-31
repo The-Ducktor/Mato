@@ -1,4 +1,3 @@
-
 //  PaneAreaView.swift
 //  Mato
 //
@@ -92,54 +91,59 @@ struct DraggablePane: View {
     @State private var isDragging = false
     
     var body: some View {
-        FileManagerPane(
-            viewModel: paneManager.panes[paneIndex],
-            isActive: paneManager.activePaneIndex == paneIndex,
-            onActivate: { paneManager.setActivePane(index: paneIndex) }
-        )
-        .contentShape(Rectangle())
-        .onTapGesture {
-            paneManager.setActivePane(index: paneIndex)
-        }
-        .draggable("\(paneIndex)") {
-            // Custom drag preview
-            Text("Pane \(paneIndex + 1)")
-                .padding()
-                .background(Color.accentColor.opacity(0.8))
-                .cornerRadius(8)
-                .onAppear {
-                    draggedPaneIndex = paneIndex
-                    isDragging = true
+        Group {
+            if paneIndex < paneManager.panes.count {
+                FileManagerPane(
+                    viewModel: paneManager.panes[paneIndex],
+                    isActive: paneManager.activePaneIndex == paneIndex,
+                    onActivate: { paneManager.setActivePane(index: paneIndex) }
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    paneManager.setActivePane(index: paneIndex)
                 }
-        }
-        .dropDestination(for: String.self) { items, location in
-            guard let draggedIndexString = items.first,
-                  let draggedIndex = Int(draggedIndexString),
-                  draggedIndex != paneIndex else {
-                draggedPaneIndex = nil
-                isDragging = false
-                return false
-            }
-            
-            paneManager.swapPanes(from: draggedIndex, to: paneIndex)
-            draggedPaneIndex = nil
-            isDragging = false
-            return true
-        } isTargeted: { targeted in
-            isDropTarget = targeted
-        }
-        .opacity(draggedPaneIndex == paneIndex ? 0.5 : 1.0)
-               .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(isDropTarget && draggedPaneIndex != paneIndex ? Color.accentColor : Color.clear, lineWidth: 3)
-                .padding(2)
-        )
-   
-        .onChange(of: isDragging) { oldValue, newValue in
-            if !newValue {
-                // Small delay to ensure drop completes first
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                .draggable("\(paneIndex)") {
+                    // Custom drag preview
+                    Text("Pane \(paneIndex + 1)")
+                        .padding()
+                        .background(Color.accentColor.opacity(0.8))
+                        .cornerRadius(8)
+                        .onAppear {
+                            draggedPaneIndex = paneIndex
+                            isDragging = true
+                        }
+                }
+                .dropDestination(for: String.self) { items, location in
+                    guard let draggedIndexString = items.first,
+                          let draggedIndex = Int(draggedIndexString),
+                          draggedIndex != paneIndex,
+                          draggedIndex < paneManager.panes.count,
+                          paneIndex < paneManager.panes.count else {
+                        draggedPaneIndex = nil
+                        isDragging = false
+                        return false
+                    }
+                    
+                    paneManager.swapPanes(from: draggedIndex, to: paneIndex)
                     draggedPaneIndex = nil
+                    isDragging = false
+                    return true
+                } isTargeted: { targeted in
+                    isDropTarget = targeted
+                }
+                .opacity(draggedPaneIndex == paneIndex ? 0.5 : 1.0)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isDropTarget && draggedPaneIndex != paneIndex ? Color.accentColor : Color.clear, lineWidth: 3)
+                        .padding(2)
+                )
+                .onChange(of: isDragging) { oldValue, newValue in
+                    if !newValue {
+                        // Small delay to ensure drop completes first
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                            draggedPaneIndex = nil
+                        }
+                    }
                 }
             }
         }
