@@ -397,9 +397,7 @@ struct GridItemView: View {
             DirectoryContextMenuItems(
                 viewModel: viewModel,
                 ids: [item.id],
-                quickLookAction: { url in
-                    quickLookAction?(url)
-                }
+                quickLookAction: quickLookAction
             )
         }
         .onDrop(of: [UTType.fileURL], isTargeted: $isDropTargeted) {
