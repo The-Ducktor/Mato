@@ -123,27 +123,6 @@ final class FileManagerService: @unchecked Sendable {
             }
             return items
         }.value
-
-            return contents.compactMap { url in
-                do {
-                    let resourceValues = try url.resourceValues(forKeys: [
-                        .isDirectoryKey,
-                        .fileSizeKey,
-                        .contentTypeKey,
-                        .contentModificationDateKey,
-                        .creationDateKey,
-                        .isHiddenKey,
-                        .addedToDirectoryDateKey,
-                        .isApplicationKey,
-                        .nameKey
-                    ])
-                    return self.makeDirectoryItem(from: url, with: resourceValues)
-                } catch {
-                    print("Error getting attributes for \(url): \(error)")
-                    return nil
-                }
-            }
-        }.value
     }
     
     @MainActor
@@ -197,24 +176,6 @@ final class FileManagerService: @unchecked Sendable {
             return self.makeDirectoryItem(from: url, with: resourceValues)
         }.value
     }
-        return makeDirectoryItem(from: url, with: resourceValues)
-
-    func getDirectoryItem(for url: URL) async throws -> DirectoryItem {
-        return try await Task.detached(priority: .userInitiated) { [self] in
-            let resourceValues = try url.resourceValues(forKeys: [
-                .isDirectoryKey,
-                .fileSizeKey,
-                .contentTypeKey,
-                .contentModificationDateKey,
-                .creationDateKey,
-                .isHiddenKey,
-                .addedToDirectoryDateKey,
-                .isApplicationKey,
-                .nameKey
-            ])
-            return self.makeDirectoryItem(from: url, with: resourceValues)
-        }.value
-    }
 
 <<<<<<< ours
     func moveFile(from sourceURL: URL, to destinationURL: URL) async throws {
@@ -246,11 +207,6 @@ final class FileManagerService: @unchecked Sendable {
         let addedDate = resourceValues.addedToDirectoryDate ?? creationDate
         let isHidden = (resourceValues.isHidden ?? false) || fileName.hasPrefix(".")
         let isAppBundle = (resourceValues.isApplication ?? false) || url.pathExtension == "app"
-
-        if isAppBundle {
-            isDirectory = false
-            fileType = .application
-        }
 
         if isAppBundle {
             isDirectory = false

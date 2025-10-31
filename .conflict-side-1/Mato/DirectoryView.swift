@@ -17,18 +17,10 @@ struct DirectoryView: View {
     @State private var itemToRename: DirectoryItem?
     @ObservedObject private var settings = SettingsModel.shared
 
-<<<<<<< ours
     @State private var sortOrder: [KeyPathComparator<DirectoryItem>] =
         SettingsModel.keyPathComparator(
             for: SettingsModel.shared.defaultSortMethod
         )
-||||||| ancestor
-    @State private var sortOrder = [
-        KeyPathComparator(\DirectoryItem.creationDate, order: .reverse)
-    ]
-=======
-    @State private var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod)
->>>>>>> theirs
 
     init(
         viewModel: DirectoryViewModel = DirectoryViewModel(),
@@ -101,7 +93,6 @@ struct DirectoryView: View {
                         viewModel.setSortOrder(newSortOrder)
                     }
                     .onAppear {
-<<<<<<< ours
                         sortOrder = SettingsModel.keyPathComparator(
                             for: SettingsModel.shared.defaultSortMethod
                         )
@@ -113,19 +104,7 @@ struct DirectoryView: View {
                         sortOrder = SettingsModel.keyPathComparator(
                             for: newMethod
                         )
-||||||| ancestor
-=======
-                        sortOrder = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod)
-                        applySorting(with: sortOrder)
-                    }
-                    .onChange(of: SettingsModel.shared.defaultSortMethod) {
-                        _,
-                        newMethod in
-                        sortOrder = SettingsModel.keyPathComparator(
-                            for: newMethod
-                        )
->>>>>>> theirs
-                        applySorting(with: sortOrder)
+                        viewModel.setSortOrder(sortOrder)
                     }
                     .onChange(of: viewModel.currentDirectory) { _, _ in
                         // Sorting is handled by the view model
