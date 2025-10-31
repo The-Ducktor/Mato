@@ -4,6 +4,8 @@ import UniformTypeIdentifiers
 
 struct ImageIcon: View {
     @Binding var item: DirectoryItem
+    var isPlayable: Bool = false
+    
     @StateObject private var thumbnailLoader = SimpleThumbnailLoader()
     @State private var thumbnail: NSImage?
     @State private var isLoading = false
