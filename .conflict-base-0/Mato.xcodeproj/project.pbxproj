@@ -411,37 +411,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mato/Mato.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-				CURRENT_PROJECT_VERSION = 55;
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 3;
-=======
-				CURRENT_PROJECT_VERSION = 16;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 16;
-=======
-				CURRENT_PROJECT_VERSION = 17;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 17;
-=======
-				CURRENT_PROJECT_VERSION = 18;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 18;
-=======
-				CURRENT_PROJECT_VERSION = 44;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 44;
-=======
-				CURRENT_PROJECT_VERSION = 49;
->>>>>>> theirs
+				CURRENT_PROJECT_VERSION = 66;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -472,37 +442,7 @@
 				CODE_SIGN_ENTITLEMENTS = Mato/Mato.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-				CURRENT_PROJECT_VERSION = 55;
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 3;
-=======
-				CURRENT_PROJECT_VERSION = 16;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 16;
-=======
-				CURRENT_PROJECT_VERSION = 17;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 17;
-=======
-				CURRENT_PROJECT_VERSION = 18;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 18;
-=======
-				CURRENT_PROJECT_VERSION = 44;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 44;
-=======
-				CURRENT_PROJECT_VERSION = 49;
->>>>>>> theirs
+				CURRENT_PROJECT_VERSION = 66;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				ENABLE_HARDENED_RUNTIME = YES;
@@ -529,37 +469,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-				CURRENT_PROJECT_VERSION = 55;
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 3;
-=======
-				CURRENT_PROJECT_VERSION = 16;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 16;
-=======
-				CURRENT_PROJECT_VERSION = 17;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 17;
-=======
-				CURRENT_PROJECT_VERSION = 18;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 18;
-=======
-				CURRENT_PROJECT_VERSION = 44;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 44;
-=======
-				CURRENT_PROJECT_VERSION = 49;
->>>>>>> theirs
+				CURRENT_PROJECT_VERSION = 66;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -578,37 +488,7 @@
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-				CURRENT_PROJECT_VERSION = 55;
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 3;
-=======
-				CURRENT_PROJECT_VERSION = 16;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 16;
-=======
-				CURRENT_PROJECT_VERSION = 17;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 17;
-=======
-				CURRENT_PROJECT_VERSION = 18;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 18;
-=======
-				CURRENT_PROJECT_VERSION = 44;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 44;
-=======
-				CURRENT_PROJECT_VERSION = 49;
->>>>>>> theirs
+				CURRENT_PROJECT_VERSION = 66;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -626,37 +506,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-				CURRENT_PROJECT_VERSION = 55;
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 3;
-=======
-				CURRENT_PROJECT_VERSION = 16;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 16;
-=======
-				CURRENT_PROJECT_VERSION = 17;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 17;
-=======
-				CURRENT_PROJECT_VERSION = 18;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 18;
-=======
-				CURRENT_PROJECT_VERSION = 44;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 44;
-=======
-				CURRENT_PROJECT_VERSION = 49;
->>>>>>> theirs
+				CURRENT_PROJECT_VERSION = 66;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -673,37 +523,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-<<<<<<< ours
-				CURRENT_PROJECT_VERSION = 55;
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 3;
-=======
-				CURRENT_PROJECT_VERSION = 16;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 16;
-=======
-				CURRENT_PROJECT_VERSION = 17;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 17;
-=======
-				CURRENT_PROJECT_VERSION = 18;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 18;
-=======
-				CURRENT_PROJECT_VERSION = 44;
->>>>>>> theirs
-||||||| ancestor
-				CURRENT_PROJECT_VERSION = 44;
-=======
-				CURRENT_PROJECT_VERSION = 49;
->>>>>>> theirs
+				CURRENT_PROJECT_VERSION = 66;
 				DEAD_CODE_STRIPPING = YES;
 				DEVELOPMENT_TEAM = 6GHB87XLD6;
 				GENERATE_INFOPLIST_FILE = YES;
