@@ -62,7 +62,8 @@ struct DirectoryView: View {
                             DirectoryGridView(
                                 viewModel: viewModel,
                                 selectedItems: $selectedItems,
-                                sortOrder: $sortOrder
+                                sortOrder: $sortOrder,
+                                quickLookAction: openQuickLook
                             )
                         } else {
                             DirectoryTableView(
