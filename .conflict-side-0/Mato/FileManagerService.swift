@@ -116,10 +116,6 @@ final class FileManagerService: @unchecked Sendable {
         var fileType = resourceValues.contentType ?? UTType.data
         let fileName = resourceValues.name ?? url.lastPathComponent
         let fileSize = resourceValues.fileSize ?? 0
-
-        let fileType = resourceValues.contentType ?? UTType.data
-
-        var fileType = resourceValues.contentType ?? UTType.data
         let modificationDate = resourceValues.contentModificationDate ?? Date.distantPast
         let creationDate = resourceValues.creationDate ?? Date.distantPast
         let addedDate = resourceValues.addedToDirectoryDate ?? creationDate

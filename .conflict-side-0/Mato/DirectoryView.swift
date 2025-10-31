@@ -104,11 +104,7 @@ struct DirectoryView: View {
                         sortOrder = SettingsModel.keyPathComparator(
                             for: newMethod
                         )
-
-                        sortOrder = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod)
-                        applySorting(with: sortOrder)
-                    }
-                        applySorting(with: sortOrder)
+                        viewModel.setSortOrder(sortOrder)
                     }
                     .onChange(of: viewModel.currentDirectory) { _, _ in
                         // Sorting is handled by the view model
