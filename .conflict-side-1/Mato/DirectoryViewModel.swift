@@ -20,7 +20,7 @@ class DirectoryViewModel: ObservableObject {
     }
     @Published var sortedItems: [DirectoryItem] = []
     @Published var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod) {
-        didSet { 
+        didSet {
             // Immediately update sortedItems when sort order changes
             updateSortedItems()
         }
@@ -73,16 +73,6 @@ class DirectoryViewModel: ObservableObject {
     }
 
     func loadDirectory(at url: URL) {
-        isLoading = true
-        errorMessage = nil
-        
-        // Clear items immediately when changing directories to prevent showing stale data
-        items = []
-        sortedItems = []
-
-        // Update path string
-        pathString = url.path
-
         // Stop previous watcher by releasing the service (handled by ARC)
         directoryWatcherService = nil
 
@@ -95,8 +85,16 @@ class DirectoryViewModel: ObservableObject {
 
         // Capture the current state we need in the background task
         let shouldHideHiddenFiles = hideHiddenFiles
+        let previousItems = items // Keep previous items in case of error
 
-        Task { [weak self, fileManager] in
+        // Defer all published property updates to avoid "publishing during view update" warnings
+        Task { @MainActor [weak self, fileManager] in
+            guard let self = self else { return }
+            
+            self.isLoading = true
+            self.errorMessage = nil
+            self.pathString = url.path
+            
             do {
                 // Get contents on background thread using captured fileManager
                 let contents = try await fileManager.getContents(of: url)
@@ -106,15 +104,19 @@ class DirectoryViewModel: ObservableObject {
                 contents.filter { !($0.isHidden) } : contents
 
                 // Set items directly, no sorting.
-                guard let self = self else { return }
                 self.items = filteredContents
                 self.isLoading = false
 
             } catch {
-                // Handle error on main actor
-                guard let self = self else { return }
+                // Handle error on main actor - keep previous items and stay in current directory
                 self.errorMessage = "Error loading directory: \(error.localizedDescription)"
+                self.items = previousItems // Restore previous items
                 self.isLoading = false
+                
+                // Reset path string to current directory
+                if let currentDir = self.currentDirectory {
+                    self.pathString = currentDir.path
+                }
             }
         }
     }

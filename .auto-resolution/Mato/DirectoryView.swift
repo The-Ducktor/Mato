@@ -31,7 +31,7 @@ struct DirectoryView: View {
     }
 
     var body: some View {
-        VStack {
+        VStack(spacing: 0) {
             PathBar(
                 path: viewModel.currentDirectory
                     ?? URL(fileURLWithPath: "/Users"),
@@ -41,16 +41,33 @@ struct DirectoryView: View {
             .onTapGesture {
                 onActivate?()
             }
+            
+            // Error banner
+            if let error = viewModel.errorMessage {
+                HStack {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Button(action: {
+                        viewModel.errorMessage = nil
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(Color.orange.opacity(0.15))
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
 
             ZStack {
-                if let error = viewModel.errorMessage {
-                    ErrorView(error: error) {
-                        viewModel.loadDownloadsDirectory()
-                        onActivate?()
-                    }
-                } else {
-                    Group {
-                        if settings.viewMode == "grid" {
+                Group {
+                    if settings.viewMode == "grid" {
                             DirectoryGridView(
                                 viewModel: viewModel,
                                 selectedItems: $selectedItems,
@@ -109,7 +126,6 @@ struct DirectoryView: View {
                         return .handled
                     }
                     .quickLookPreview($quickLookURL, in: selectedItemURLs)
-                }
 
                 if viewModel.isLoading {
                     LoadingView()
