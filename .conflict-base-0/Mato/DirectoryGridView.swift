@@ -73,7 +73,12 @@ struct DirectoryGridView: View {
                 containerWidth = geometry.size.width
             }
             .onChange(of: geometry.size.width) { _, newWidth in
-                containerWidth = newWidth
+                // Use a transaction to ensure smooth updates
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) {
+                    containerWidth = newWidth
+                }
             }
         }
         .onDrop(
@@ -88,6 +93,12 @@ struct DirectoryGridView: View {
                 selectedItems.removeAll()
             }
         }
+        .onChange(of: viewModel.sortedItems) { _, _ in
+            // Update focus when items change to prevent desync
+            DispatchQueue.main.async {
+                isFocused = true
+            }
+        }
         .focusable()
         .focused($isFocused)
         .onAppear {
@@ -95,6 +106,10 @@ struct DirectoryGridView: View {
         }
         .onKeyPress(.space) {
             handleSpaceKeyPress()
+            return .handled
+        }
+        .onKeyPress(.return) {
+            handleReturnKeyPress()
             return .handled
         }
         .onKeyPress(.upArrow) {
@@ -123,6 +138,16 @@ struct DirectoryGridView: View {
         }
         
         quickLookAction?(selectedItem.url)
+    }
+    
+    private func handleReturnKeyPress() {
+        guard let firstSelectedId = selectedItems.first,
+              let selectedItem = viewModel.sortedItems.first(where: { $0.id == firstSelectedId })
+        else {
+            return
+        }
+        
+        viewModel.openItem(selectedItem)
     }
     
     private enum ArrowDirection {
@@ -233,6 +258,14 @@ struct GridItemView: View {
     private var isCurrentlyPlaying: Bool {
         audioPlayer.currentlyPlayingURL == item.url && audioPlayer.isPlaying
     }
+    
+    private var progressValue: CGFloat {
+        guard isCurrentlyPlaying,
+              audioPlayer.duration > 0 else {
+            return 0
+        }
+        return CGFloat(audioPlayer.currentTime / audioPlayer.duration)
+    }
 
     var body: some View {
         VStack(spacing: 4) {
@@ -247,6 +280,29 @@ struct GridItemView: View {
                         audioPlayer.togglePlayback(for: item.url)
                     }) {
                         ZStack {
+                            // Progress ring
+                            if isCurrentlyPlaying {
+                                Circle()
+                                    .stroke(
+                                        Color.white.opacity(0.3),
+                                        lineWidth: 2.5
+                                    )
+                                    .frame(width: 32, height: 32)
+                                
+                                Circle()
+                                    .trim(from: 0, to: progressValue)
+                                    .stroke(
+                                        Color.white,
+                                        style: StrokeStyle(
+                                            lineWidth: 2.5,
+                                            lineCap: .round
+                                        )
+                                    )
+                                    .frame(width: 32, height: 32)
+                                    .rotationEffect(.degrees(-90))
+                                    .animation(.linear(duration: 0.1), value: progressValue)
+                            }
+                            
                             // Background circle
                             Circle()
                                 .frame(width: 28, height: 28).glassEffect()
