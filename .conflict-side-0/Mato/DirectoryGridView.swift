@@ -10,37 +10,71 @@ struct DirectoryGridView: View {
     @StateObject private var audioPlayer = AudioPlayerService.shared
     @State private var hoveredItemID: DirectoryItem.ID?
     @State private var isDropTargeted: Bool = false
+    @FocusState private var isFocused: Bool
+    @State private var containerWidth: CGFloat = 800
 
     // Grid configuration
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 120), spacing: 16)
     ]
+    
+    // Calculate number of columns based on actual container width
+    private var itemsPerRow: Int {
+        let itemMinWidth: CGFloat = 100
+        let itemMaxWidth: CGFloat = 120
+        let spacing: CGFloat = 16
+        let padding: CGFloat = 32 // 16 padding on each side
+        
+        let availableWidth = containerWidth - padding
+        
+        // Calculate how many items fit at minimum width
+        let maxColumns = Int(availableWidth / (itemMinWidth + spacing))
+        
+        // Calculate actual item width with spacing
+        let actualItemWidth = (availableWidth - CGFloat(maxColumns - 1) * spacing) / CGFloat(maxColumns)
+        
+        // If actual width exceeds max, reduce column count
+        if actualItemWidth > itemMaxWidth {
+            let adjustedColumns = Int(availableWidth / (itemMaxWidth + spacing))
+            return max(1, adjustedColumns)
+        }
+        
+        return max(1, maxColumns)
+    }
 
     var body: some View {
-        ScrollView {
-            LazyVGrid(columns: columns, spacing: 16) {
-                ForEach(viewModel.sortedItems) { item in
-                    GridItemView(
-                        item: item,
-                        isSelected: selectedItems.contains(item.id),
-                        isHovered: hoveredItemID == item.id,
-                        viewModel: viewModel,
-                        selectedItems: $selectedItems,
-                        quickLookAction: quickLookAction
-                    )
-                    .onTapGesture {
-                        handleTap(item: item)
+        GeometryReader { geometry in
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 16) {
+                    ForEach(viewModel.sortedItems) { item in
+                        GridItemView(
+                            item: item,
+                            isSelected: selectedItems.contains(item.id),
+                            isHovered: hoveredItemID == item.id,
+                            viewModel: viewModel,
+                            selectedItems: $selectedItems,
+                            quickLookAction: quickLookAction
+                        )
+                        .onTapGesture {
+                            handleTap(item: item)
+                        }
+                        .onTapGesture(count: 2) {
+                            handleDoubleTap(item: item)
+                        }
+                        .onHover { hovering in
+                            hoveredItemID = hovering ? item.id : nil
+                        }
+                        .draggable(makeDraggedFiles(for: item))
                     }
-                    .onTapGesture(count: 2) {
-                        handleDoubleTap(item: item)
-                    }
-                    .onHover { hovering in
-                        hoveredItemID = hovering ? item.id : nil
-                    }
-                    .draggable(makeDraggedFiles(for: item))
                 }
+                .padding()
             }
-            .padding()
+            .onAppear {
+                containerWidth = geometry.size.width
+            }
+            .onChange(of: geometry.size.width) { _, newWidth in
+                containerWidth = newWidth
+            }
         }
         .onDrop(
             of: [UTType.fileURL],
@@ -54,11 +88,31 @@ struct DirectoryGridView: View {
                 selectedItems.removeAll()
             }
         }
+        .focusable()
+        .focused($isFocused)
+        .onAppear {
+            isFocused = true
+        }
         .onKeyPress(.space) {
             handleSpaceKeyPress()
             return .handled
         }
-        .focusable()
+        .onKeyPress(.upArrow) {
+            handleArrowKey(.up)
+            return .handled
+        }
+        .onKeyPress(.downArrow) {
+            handleArrowKey(.down)
+            return .handled
+        }
+        .onKeyPress(.leftArrow) {
+            handleArrowKey(.left)
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            handleArrowKey(.right)
+            return .handled
+        }
     }
     
     private func handleSpaceKeyPress() {
@@ -70,21 +124,71 @@ struct DirectoryGridView: View {
         
         quickLookAction?(selectedItem.url)
     }
+    
+    private enum ArrowDirection {
+        case up, down, left, right
+    }
+    
+    private func handleArrowKey(_ direction: ArrowDirection) {
+        let items = viewModel.sortedItems
+        guard !items.isEmpty else { return }
+        
+        // If no selection, select the first item
+        guard let currentId = selectedItems.first,
+              let currentIndex = items.firstIndex(where: { $0.id == currentId }) else {
+            selectedItems = [items[0].id]
+            return
+        }
+        
+        var newIndex = currentIndex
+        
+        switch direction {
+        case .left:
+            newIndex = max(0, currentIndex - 1)
+        case .right:
+            newIndex = min(items.count - 1, currentIndex + 1)
+        case .up:
+            newIndex = max(0, currentIndex - itemsPerRow)
+        case .down:
+            newIndex = min(items.count - 1, currentIndex + itemsPerRow)
+        }
+        
+        // Only update if the index changed
+        if newIndex != currentIndex {
+            // Use transaction to improve performance
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                if NSEvent.modifierFlags.contains(.shift) {
+                    // Add to selection
+                    selectedItems.insert(items[newIndex].id)
+                } else {
+                    // Replace selection
+                    selectedItems = [items[newIndex].id]
+                }
+            }
+        }
+    }
 
     private func handleTap(item: DirectoryItem) {
-        if NSEvent.modifierFlags.contains(.command) {
-            // Toggle selection
-            if selectedItems.contains(item.id) {
-                selectedItems.remove(item.id)
-            } else {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        
+        withTransaction(transaction) {
+            if NSEvent.modifierFlags.contains(.command) {
+                // Toggle selection
+                if selectedItems.contains(item.id) {
+                    selectedItems.remove(item.id)
+                } else {
+                    selectedItems.insert(item.id)
+                }
+            } else if NSEvent.modifierFlags.contains(.shift) {
+                // Range selection (simplified for grid)
                 selectedItems.insert(item.id)
+            } else {
+                // Single selection
+                selectedItems = [item.id]
             }
-        } else if NSEvent.modifierFlags.contains(.shift) {
-            // Range selection (simplified for grid)
-            selectedItems.insert(item.id)
-        } else {
-            // Single selection
-            selectedItems = [item.id]
         }
     }
 
