@@ -131,11 +131,6 @@ final class FileManagerService: @unchecked Sendable {
             fileType = .application
         }
 
-        if isAppBundle {
-            isDirectory = false
-            fileType = .application
-        }
-
         return DirectoryItem(
             isDirectory: isDirectory,
             isAppBundle: isAppBundle,
