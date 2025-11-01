@@ -11,11 +11,13 @@ struct PinnedFolder: Identifiable, Codable, Hashable {
     let id: UUID
     let url: URL
     let name: String
+    var icon: String
     
-    init(url: URL, name: String? = nil) {
+    init(url: URL, name: String? = nil, icon: String = "folder") {
         self.id = UUID()
         self.url = url
         self.name = name ?? url.lastPathComponent
+        self.icon = icon
     }
 }
 
@@ -47,6 +49,22 @@ class PinnedFolderStore: ObservableObject {
     func removePinnedFolder(with id: UUID) {
         if let index = pinnedFolders.firstIndex(where: { $0.id == id }) {
             pinnedFolders.remove(at: index)
+            savePinnedFolders()
+        }
+    }
+    
+    func movePinnedFolder(from source: Int, to destination: Int) {
+        guard source < pinnedFolders.count && destination < pinnedFolders.count else { return }
+        let folder = pinnedFolders.remove(at: source)
+        pinnedFolders.insert(folder, at: destination)
+        savePinnedFolders()
+    }
+    
+    func updatePinnedFolderIcon(with id: UUID, icon: String) {
+        if let index = pinnedFolders.firstIndex(where: { $0.id == id }) {
+            var updatedFolder = pinnedFolders[index]
+            updatedFolder.icon = icon
+            pinnedFolders[index] = updatedFolder
             savePinnedFolders()
         }
     }
