@@ -6,30 +6,29 @@ struct ImageIcon: View {
     @Binding var item: DirectoryItem
     var isPlayable: Bool = false
     
-    @StateObject private var thumbnailLoader = SimpleThumbnailLoader()
     @State private var thumbnail: NSImage?
     @State private var isLoading = false
+    @State private var loadTask: Task<Void, Never>?
+    
+    // Shared thumbnail loader for better caching
+    private static let sharedLoader = SimpleThumbnailLoader()
     
     var body: some View {
         Group {
             if let thumbnail = thumbnail {
                 Image(nsImage: thumbnail)
                     .resizable()
-                    
                     .aspectRatio(contentMode: .fit)
                     .cornerRadius(3)
-                    
-                  
             } else if isLoading {
                 ZStack {
-                    
                     Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                         .resizable()
-                        .aspectRatio(contentMode: .fit).scaleEffect(0.5)
+                        .aspectRatio(contentMode: .fit)
+                        .scaleEffect(0.5)
                     ProgressView()
                         .controlSize(.small)
                 }
-               
             } else {
                 Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                     .resizable()
@@ -39,34 +38,54 @@ struct ImageIcon: View {
         .task(id: item.id) {
             await loadThumbnail()
         }
+        .onDisappear {
+            loadTask?.cancel()
+            loadTask = nil
+        }
     }
     
     private func loadThumbnail() async {
+        // Cancel any existing load task
+        loadTask?.cancel()
+        
         // Skip thumbnail generation for directories or text-based files
         guard !item.isDirectory && !item.isTextBasedFile else {
             thumbnail = NSWorkspace.shared.icon(forFile: item.url.path)
             return
         }
         
-        isLoading = true
-        defer { isLoading = false }
-        
-        do {
-            let options = SimpleThumbnailLoader.ThumbnailOptions(
-                size: CGSize(width: 256, height: 256),
-                scale: 2.0,
-                maintainAspectRatio: true
-            )
-            let loader = thumbnailLoader
-            let url = item.url
-            // Run thumbnail generation on background thread
-            thumbnail = try await Task.detached {
-                try await loader.generateThumbnail(for: url, options: options)
-            }.value
-        } catch {
-            // Fallback to system icon on error
-            thumbnail = NSWorkspace.shared.icon(forFile: item.url.path)
+        // Create a new task that can be cancelled
+        loadTask = Task {
+            isLoading = true
+            defer { isLoading = false }
+            
+            do {
+                let options = SimpleThumbnailLoader.ThumbnailOptions(
+                    size: CGSize(width: 128, height: 128), // Reduced size for grid view
+                    scale: 2.0,
+                    maintainAspectRatio: true
+                )
+                let url = item.url
+                
+                // Check if task was cancelled
+                try Task.checkCancellation()
+                
+                // Use shared loader for better cache hit rate
+                let loadedThumbnail = try await Self.sharedLoader.generateThumbnail(for: url, options: options)
+                
+                // Check again before updating state
+                try Task.checkCancellation()
+                
+                thumbnail = loadedThumbnail
+            } catch is CancellationError {
+                // Task was cancelled, do nothing
+            } catch {
+                // Fallback to system icon on error
+                thumbnail = NSWorkspace.shared.icon(forFile: item.url.path)
+            }
         }
+        
+        await loadTask?.value
     }
 }
 

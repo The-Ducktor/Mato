@@ -12,6 +12,7 @@ struct DirectoryGridView: View {
     @State private var isDropTargeted: Bool = false
     @FocusState private var isFocused: Bool
     @State private var containerWidth: CGFloat = 800
+    @State private var hoverDebounceTask: Task<Void, Never>?
 
     // Grid configuration
     private let columns = [
@@ -46,7 +47,7 @@ struct DirectoryGridView: View {
         GeometryReader { geometry in
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(viewModel.sortedItems) { item in
+                    ForEach(viewModel.sortedItems, id: \.id) { item in
                         GridItemView(
                             item: item,
                             isSelected: selectedItems.contains(item.id),
@@ -55,6 +56,7 @@ struct DirectoryGridView: View {
                             selectedItems: $selectedItems,
                             quickLookAction: quickLookAction
                         )
+                        .id(item.id)
                         .onTapGesture {
                             handleTap(item: item)
                         }
@@ -62,7 +64,7 @@ struct DirectoryGridView: View {
                             handleDoubleTap(item: item)
                         }
                         .onHover { hovering in
-                            hoveredItemID = hovering ? item.id : nil
+                            handleHover(item: item, hovering: hovering)
                         }
                         .draggable(makeDraggedFiles(for: item))
                     }
@@ -214,6 +216,24 @@ struct DirectoryGridView: View {
     private func handleDoubleTap(item: DirectoryItem) {
         viewModel.openItem(item)
     }
+    
+    private func handleHover(item: DirectoryItem, hovering: Bool) {
+        // Cancel any pending hover task
+        hoverDebounceTask?.cancel()
+        
+        if hovering {
+            // Set immediately for hover-in
+            hoveredItemID = item.id
+        } else {
+            // Small debounce for hover-out to prevent flicker
+            hoverDebounceTask = Task {
+                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+                if !Task.isCancelled {
+                    hoveredItemID = nil
+                }
+            }
+        }
+    }
 
     private func makeDraggedFiles(for item: DirectoryItem) -> DraggedFiles {
         let urlsToDrag: [URL]
@@ -242,14 +262,15 @@ struct GridItemView: View {
     @Binding var selectedItems: Set<DirectoryItem.ID>
     var quickLookAction: ((URL) -> Void)?
 
-    @StateObject private var audioPlayer = AudioPlayerService.shared
+    @ObservedObject private var audioPlayer = AudioPlayerService.shared
     @State private var isDropTargeted = false
     @State private var showProgressRing = false
     @State private var isPressed = false
     @State private var optimisticPlayState: Bool?
+    @State private var cachedIsPlayable: Bool = false
 
     private var isPlayable: Bool {
-        audioPlayer.isPlayableMedia(item)
+        cachedIsPlayable
     }
 
     private var isCurrentlyPlaying: Bool {
@@ -373,6 +394,7 @@ struct GridItemView: View {
             }
             .onAppear {
                 showProgressRing = isCurrentFile
+                cachedIsPlayable = audioPlayer.isPlayableMedia(item)
             }
 
             // Name
@@ -392,6 +414,8 @@ struct GridItemView: View {
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(backgroundFill)
+                .animation(.linear(duration: 0.1), value: isSelected)
+                .animation(.linear(duration: 0.1), value: isHovered)
         )
         .contextMenu {
             DirectoryContextMenuItems(

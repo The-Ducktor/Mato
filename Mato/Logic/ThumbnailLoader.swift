@@ -45,8 +45,8 @@ final class SimpleThumbnailLoader: ObservableObject, @unchecked Sendable {
     }
     
     private func setupCache() {
-        imageCache.countLimit = 100
-        imageCache.totalCostLimit = 50 * 1024 * 1024 // 50MB
+        imageCache.countLimit = 500 // Increased for better caching
+        imageCache.totalCostLimit = 100 * 1024 * 1024 // 100MB
     }
     
     // MARK: - Public Methods
@@ -71,12 +71,12 @@ final class SimpleThumbnailLoader: ObservableObject, @unchecked Sendable {
     
     private func generateQuickLookThumbnail(for url: URL, options: ThumbnailOptions) async throws -> NSImage {
         return try await withCheckedThrowingContinuation { continuation in
-            // Use .icon to prevent cropping and maintain aspect ratio
+            // Use .thumbnail with .icon fallback for optimal performance
             let request = QLThumbnailGenerator.Request(
                 fileAt: url,
                 size: options.size,
                 scale: options.scale,
-                representationTypes: .lowQualityThumbnail
+                representationTypes: [.thumbnail, .icon]
             )
             
             thumbnailGenerator.generateBestRepresentation(for: request) { representation, error in
