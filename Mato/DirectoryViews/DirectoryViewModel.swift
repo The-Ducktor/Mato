@@ -34,6 +34,22 @@ class DirectoryViewModel: ObservableObject {
     @Published var pathString: String = ""
     @Published var hideHiddenFiles: Bool = true
     
+    // Search properties
+    @Published var isSearching: Bool = false
+    @Published var searchText: String = "" {
+        didSet {
+            updateSortedItems()
+        }
+    }
+    
+    // Computed property for filtered items based on search
+    var displayedItems: [DirectoryItem] {
+        guard !searchText.isEmpty else { return sortedItems }
+        return sortedItems.filter { item in
+            item.name.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+    
     // Per-pane view state
     @Published var viewMode: ViewMode = .list
     @Published var currentSortMethod: String = "date"
@@ -91,7 +107,13 @@ class DirectoryViewModel: ObservableObject {
         
         // Load per-directory preferences
         let pref = preferencesManager.getPreference(for: url)
-        viewMode = pref.viewMode
+        
+        // Only load saved view mode if the setting is enabled
+        if SettingsModel.shared.useSavedViewMode {
+            viewMode = pref.viewMode
+        }
+        // Otherwise keep current view mode
+        
         currentSortMethod = pref.sortMethod
         sortAscending = pref.sortAscending
         
@@ -155,13 +177,9 @@ class DirectoryViewModel: ObservableObject {
     // MARK: - View Preferences
     
     func setViewMode(_ mode: ViewMode) {
-        // Defer publishing to avoid "publishing during view updates" when called from view callbacks
-        Task { @MainActor [weak self] in
-            guard let self = self else { return }
-            self.viewMode = mode
-            if let url = self.currentDirectory {
-                self.preferencesManager.setViewMode(for: url, viewMode: mode)
-            }
+        viewMode = mode
+        if let url = currentDirectory {
+            preferencesManager.setViewMode(for: url, viewMode: mode)
         }
     }
     
@@ -673,4 +691,3 @@ class DirectoryViewModel: ObservableObject {
     // MARK: - Directory Watching
     // (All logic now handled by DirectoryWatcherService)
 }
-

@@ -55,6 +55,32 @@ struct SettingsView: View {
                             .controlSize(.regular)
                         }
                     }
+                    
+                    // View Mode Preference Card
+                    SettingsCard(
+                        title: "View Mode Behavior",
+                        subtitle: "Choose how view mode is handled when navigating folders",
+                        icon: "square.grid.2x2"
+                    ) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Toggle(isOn: $settings.useSavedViewMode) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Remember view mode per folder")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundColor(.primary)
+                                    
+                                    Text(settings.useSavedViewMode ? 
+                                         "Each folder will remember its own view mode (grid/list)" : 
+                                         "All folders will use the current view mode")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .toggleStyle(.switch)
+                            .controlSize(.regular)
+                        }
+                    }
                    
                     
                     // Folder Selection Card
