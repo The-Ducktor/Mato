@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var searchText: String = ""
+  
     @StateObject private var pinnedFolderStore = PinnedFolderStore.shared
     @State private var showingAddPinnedFolderSheet = false
     @StateObject private var paneManager = PaneManager()
@@ -36,9 +36,7 @@ struct ContentView: View {
                         )
                     }
 
-                    ToolbarItem(placement: .principal) {
-                        SearchBar(searchText: $searchText)
-                    }
+                    
 
                     ToolbarItemGroup(placement: .primaryAction) {
                         ViewModeToggle(paneManager: paneManager)

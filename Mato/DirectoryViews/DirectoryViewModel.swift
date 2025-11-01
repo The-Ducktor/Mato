@@ -155,9 +155,13 @@ class DirectoryViewModel: ObservableObject {
     // MARK: - View Preferences
     
     func setViewMode(_ mode: ViewMode) {
-        viewMode = mode
-        if let url = currentDirectory {
-            preferencesManager.setViewMode(for: url, viewMode: mode)
+        // Defer publishing to avoid "publishing during view updates" when called from view callbacks
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            self.viewMode = mode
+            if let url = self.currentDirectory {
+                self.preferencesManager.setViewMode(for: url, viewMode: mode)
+            }
         }
     }
     
