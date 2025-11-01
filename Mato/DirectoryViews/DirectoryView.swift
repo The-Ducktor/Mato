@@ -15,7 +15,6 @@ struct DirectoryView: View {
     @State private var showingRenameAlert = false
     @State private var renameText = ""
     @State private var itemToRename: DirectoryItem?
-    @ObservedObject private var settings = SettingsModel.shared
 
     @State private var sortOrder: [KeyPathComparator<DirectoryItem>] =
         SettingsModel.keyPathComparator(
@@ -67,7 +66,7 @@ struct DirectoryView: View {
 
             ZStack {
                 Group {
-                    if settings.viewMode == "grid" {
+                    if viewModel.viewMode == .grid {
                             DirectoryGridView(
                                 viewModel: viewModel,
                                 selectedItems: $selectedItems,

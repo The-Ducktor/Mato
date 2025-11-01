@@ -110,22 +110,112 @@ struct SearchBar: View {
     }
 }
 
-// MARK: - View Mode Toggle
+// MARK: - View Mode Toggle (Per-Pane)
 struct ViewModeToggle: View {
-    @ObservedObject private var settings = SettingsModel.shared
+    @ObservedObject var paneManager: PaneManager
     
     var body: some View {
-        Picker("View Mode", selection: $settings.viewMode) {
-            Image(systemName: "list.bullet")
-                .tag("list")
-                .help("List View")
-            Image(systemName: "square.grid.2x2")
-                .tag("grid")
-                .help("Grid View")
+        Group {
+            if let activePane = paneManager.activePane {
+                Picker("View Mode", selection: Binding(
+                    get: { activePane.viewMode },
+                    set: { activePane.setViewMode($0) }
+                )) {
+                    Image(systemName: "list.bullet")
+                        .tag(ViewMode.list)
+                        .help("List View")
+                    Image(systemName: "square.grid.2x2")
+                        .tag(ViewMode.grid)
+                        .help("Grid View")
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 80)
+                .help("Change View Mode")
+            }
         }
-        .pickerStyle(.segmented)
-        .frame(width: 80)
-        .help("Change View Mode")
+    }
+}
+
+// MARK: - Sort Menu (Per-Pane)
+struct SortMenu: View {
+    @ObservedObject var paneManager: PaneManager
+    
+    var body: some View {
+        Group {
+            if let activePane = paneManager.activePane {
+                Menu {
+                    // Sort methods
+                    Section("Sort By") {
+                        ForEach(SettingsModel.shared.sortMethods, id: \.self) { method in
+                            Button {
+                                activePane.setSortMethod(method, ascending: activePane.sortAscending)
+                            } label: {
+                                HStack {
+                                    Text(sortMethodLabel(method))
+                                    if activePane.currentSortMethod == method {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Sort direction
+                    Section("Order") {
+                        Button {
+                            activePane.setSortMethod(activePane.currentSortMethod, ascending: false)
+                        } label: {
+                            HStack {
+                                Text("Descending")
+                                if !activePane.sortAscending {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        Button {
+                            activePane.setSortMethod(activePane.currentSortMethod, ascending: true)
+                        } label: {
+                            HStack {
+                                Text("Ascending")
+                                if activePane.sortAscending {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: sortIcon(for: activePane.currentSortMethod, ascending: activePane.sortAscending))
+                }
+                .help("Sort Options")
+            }
+        }
+    }
+    
+    private func sortMethodLabel(_ method: String) -> String {
+        switch method {
+        case "name": return "Name"
+        case "date": return "Date Modified"
+        case "size": return "Size"
+        case "type": return "Kind"
+        case "created": return "Date Created"
+        default: return method.capitalized
+        }
+    }
+    
+    private func sortIcon(for method: String, ascending: Bool) -> String {
+        let baseIcon: String
+        switch method {
+        case "name": baseIcon = "textformat"
+        case "date", "created": baseIcon = "calendar"
+        case "size": baseIcon = "arrow.up.arrow.down"
+        case "type": baseIcon = "doc"
+        default: baseIcon = "arrow.up.arrow.down"
+        }
+        
+        return ascending ? "\(baseIcon)" : "\(baseIcon)"
     }
 }
 

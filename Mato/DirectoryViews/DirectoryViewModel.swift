@@ -33,6 +33,11 @@ class DirectoryViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var pathString: String = ""
     @Published var hideHiddenFiles: Bool = true
+    
+    // Per-pane view state
+    @Published var viewMode: ViewMode = .list
+    @Published var currentSortMethod: String = "date"
+    @Published var sortAscending: Bool = false
 
     // Rename alert state
     @Published var showingRenameAlert = false
@@ -45,6 +50,7 @@ class DirectoryViewModel: ObservableObject {
     private var pendingMoveOperation: (() -> Void)?
 
     private let fileManager = FileManagerService.shared
+    private let preferencesManager = DirectoryPreferencesManager.shared
 
     // Directory watching service
     private var directoryWatcherService: DirectoryWatcherService?
@@ -82,6 +88,15 @@ class DirectoryViewModel: ObservableObject {
                 self?.refreshCurrentDirectory()
             }
         }
+        
+        // Load per-directory preferences
+        let pref = preferencesManager.getPreference(for: url)
+        viewMode = pref.viewMode
+        currentSortMethod = pref.sortMethod
+        sortAscending = pref.sortAscending
+        
+        // Apply sort order based on preferences
+        sortOrder = createSortOrder(for: pref.sortMethod, ascending: pref.sortAscending)
 
         // Capture the current state we need in the background task
         let shouldHideHiddenFiles = hideHiddenFiles
@@ -135,6 +150,46 @@ class DirectoryViewModel: ObservableObject {
         // Update happens automatically via didSet, but we set it explicitly here
         // to be clear about the intent
         sortOrder = newSortOrder
+    }
+    
+    // MARK: - View Preferences
+    
+    func setViewMode(_ mode: ViewMode) {
+        viewMode = mode
+        if let url = currentDirectory {
+            preferencesManager.setViewMode(for: url, viewMode: mode)
+        }
+    }
+    
+    func setSortMethod(_ method: String, ascending: Bool = false) {
+        currentSortMethod = method
+        sortAscending = ascending
+        
+        // Update sort order
+        sortOrder = createSortOrder(for: method, ascending: ascending)
+        
+        // Save preference
+        if let url = currentDirectory {
+            preferencesManager.setSortMethod(for: url, sortMethod: method, ascending: ascending)
+        }
+    }
+    
+    private func createSortOrder(for method: String, ascending: Bool) -> [KeyPathComparator<DirectoryItem>] {
+        // Create comparators based on method and direction
+        switch method {
+        case "name":
+            return [KeyPathComparator(\DirectoryItem.name, order: ascending ? .forward : .reverse)]
+        case "date":
+            return [KeyPathComparator(\DirectoryItem.lastModified, order: ascending ? .forward : .reverse)]
+        case "size":
+            return [KeyPathComparator(\DirectoryItem.size, order: ascending ? .forward : .reverse)]
+        case "type":
+            return [KeyPathComparator(\DirectoryItem.fileTypeDescription, order: ascending ? .forward : .reverse)]
+        case "created":
+            return [KeyPathComparator(\DirectoryItem.creationDate, order: ascending ? .forward : .reverse)]
+        default:
+            return [KeyPathComparator(\DirectoryItem.lastModified, order: ascending ? .forward : .reverse)]
+        }
     }
 
     func openItem(_ item: DirectoryItem) {
