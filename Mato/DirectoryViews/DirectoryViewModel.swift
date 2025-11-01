@@ -124,16 +124,20 @@ class DirectoryViewModel: ObservableObject {
         currentDirectory = url
         pathString = url.path
         
+        // Set loading state immediately (synchronously) to prevent UI from showing old content
+        isLoading = true
+        errorMessage = nil
+        
+        // Clear items immediately to prevent showing old directory content
+        items = []
+        
         // Capture the current state we need in the background task
         let shouldHideHiddenFiles = hideHiddenFiles
         let previousItems = items // Keep previous items in case of error
 
-        // Defer all published property updates to avoid "publishing during view update" warnings
+        // Defer directory loading to avoid "publishing during view update" warnings
         Task { @MainActor [weak self, fileManager] in
             guard let self = self else { return }
-            
-            self.isLoading = true
-            self.errorMessage = nil
             
             do {
                 // Get contents on background thread using captured fileManager
