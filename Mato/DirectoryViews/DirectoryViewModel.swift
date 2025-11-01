@@ -77,8 +77,9 @@ class DirectoryViewModel: ObservableObject {
     init() {
         // Use default folder from settings
         let defaultURL = SettingsModel.shared.defaultFolderURL
-        currentDirectory = defaultURL
         navigationStack = [defaultURL]
+        currentDirectory = defaultURL  // Set immediately to prevent showing wrong directory
+        pathString = defaultURL.path
         loadDirectory(at: defaultURL)
     }
 
@@ -88,7 +89,6 @@ class DirectoryViewModel: ObservableObject {
             return
         }
 
-        currentDirectory = downloadsURL
         navigationStack = [downloadsURL]
         forwardStack = []
         loadDirectory(at: downloadsURL)
@@ -120,6 +120,10 @@ class DirectoryViewModel: ObservableObject {
         // Apply sort order based on preferences
         sortOrder = createSortOrder(for: pref.sortMethod, ascending: pref.sortAscending)
 
+        // Update currentDirectory and pathString immediately to prevent showing wrong directory
+        currentDirectory = url
+        pathString = url.path
+        
         // Capture the current state we need in the background task
         let shouldHideHiddenFiles = hideHiddenFiles
         let previousItems = items // Keep previous items in case of error
@@ -130,7 +134,6 @@ class DirectoryViewModel: ObservableObject {
             
             self.isLoading = true
             self.errorMessage = nil
-            self.pathString = url.path
             
             do {
                 // Get contents on background thread using captured fileManager
@@ -220,7 +223,6 @@ class DirectoryViewModel: ObservableObject {
             forwardStack.removeAll()
 
             // Navigate into the directory
-            currentDirectory = item.url
             navigationStack.append(item.url)
             loadDirectory(at: item.url)
         } else {
@@ -243,7 +245,6 @@ class DirectoryViewModel: ObservableObject {
 
         // Go to previous directory
         if let previousDirectory = navigationStack.last {
-            currentDirectory = previousDirectory
             loadDirectory(at: previousDirectory)
         }
     }
@@ -256,7 +257,6 @@ class DirectoryViewModel: ObservableObject {
 
         // Add it to the navigation stack
         navigationStack.append(nextDirectory)
-        currentDirectory = nextDirectory
         loadDirectory(at: nextDirectory)
     }
 
@@ -276,8 +276,6 @@ class DirectoryViewModel: ObservableObject {
 
         if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
             // Valid directory, navigate to it
-            currentDirectory = url
-
             // Reset navigation stack to just this path
             // (since we don't know the hierarchy when manually entering a path)
             navigationStack = [url]

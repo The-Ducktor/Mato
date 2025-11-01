@@ -14,10 +14,9 @@ struct PathBar: View {
     @State var path: URL
     @FocusState private var isTextFieldFocused: Bool
     
-    init(path: URL? = nil, viewModel: DirectoryViewModel) {
-        let defaultURL = path ?? SettingsModel.shared.defaultFolderURL
-        self.path = defaultURL
-        self._pathString = State(initialValue: defaultURL.path)
+    init(path: URL, viewModel: DirectoryViewModel) {
+        self.path = path
+        self._pathString = State(initialValue: path.path)
         self.viewModel = viewModel
     }
     

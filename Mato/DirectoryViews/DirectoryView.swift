@@ -31,14 +31,25 @@ struct DirectoryView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            PathBar(
-                path: viewModel.currentDirectory
-                    ?? URL(fileURLWithPath: "/Users"),
-                viewModel: viewModel
-            )
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onActivate?()
+            if let currentDirectory = viewModel.currentDirectory {
+                PathBar(
+                    path: currentDirectory,
+                    viewModel: viewModel
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onActivate?()
+                }
+            } else {
+                // Show empty path bar while loading
+                Rectangle()
+                    .fill(Color(NSColor.controlBackgroundColor))
+                    .frame(height: 34)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 10)
             }
             
             // Error banner
