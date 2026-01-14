@@ -26,7 +26,11 @@ final class FileManagerService: @unchecked Sendable {
                 .fileSizeKey,
                 .contentTypeKey,
                 .contentModificationDateKey,
-                .creationDateKey
+                .creationDateKey,
+                .isHiddenKey,
+                .addedToDirectoryDateKey,
+                .isApplicationKey,
+                .nameKey
             ])
 
             var items: [DirectoryItem] = []

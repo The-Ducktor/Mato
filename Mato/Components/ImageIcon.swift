@@ -22,7 +22,7 @@ struct ImageIcon: View {
                     .cornerRadius(3)
             } else {
                 ZStack {
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
+                    Image(nsImage: ImageIcon.cachedWorkspaceIcon(for: item.url))
                         .resizable()
                         .aspectRatio(contentMode: .fit)
                         .scaleEffect(isLoading ? 0.5 : 1.0)
@@ -79,41 +79,30 @@ struct ImageIcon: View {
     }
 }
 
-extension DirectoryItem {
-    var isTextBasedFile: Bool {
-        // Get the UTType for the file
-        guard let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType else {
-            // Fallback to extension-based check
-            return isTextBasedByExtension
-        }
-        
-        // Check if the file conforms to text, source code, or script types
-        return contentType.conforms(to: UTType.text) ||
-               contentType.conforms(to: UTType.sourceCode) ||
-               contentType.conforms(to: UTType.script) ||
-               contentType.conforms(to: UTType.plainText) ||
-               contentType.conforms(to: UTType.json) ||
-               contentType.conforms(to: UTType.xml) ||
-               contentType.conforms(to: UTType.yaml)
-    }
+extension ImageIcon {
+    // Shared icon cache to avoid redundant NSWorkspace calls
+    private static let iconCache = NSCache<NSURL, NSImage>()
     
-    private var isTextBasedByExtension: Bool {
-        let textExtensions = [
-            // Programming languages
-            "swift", "py", "java", "js", "ts", "jsx", "tsx", "cpp", "c", "h", "hpp",
-            "cs", "rb", "go", "rs", "php", "kt", "scala", "m", "mm",
-            // Scripting
-            "sh", "bash", "zsh", "fish", "pl", "lua",
-            // Web
-            "html", "css", "scss", "sass", "less", "vue", "svelte",
-            // Data/Config
-            "json", "xml", "yaml", "yml", "toml", "ini", "conf", "config",
-            // Documentation
-            "md", "txt", "log", "csv", "tsv", "rst",
-            // Other
-            "sql", "gradle", "properties", "env"
-        ]
-        return textExtensions.contains(url.pathExtension.lowercased())
+    static func cachedWorkspaceIcon(for url: URL) -> NSImage {
+        if let cached = iconCache.object(forKey: url as NSURL) {
+            return cached
+        }
+        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        iconCache.setObject(icon, forKey: url as NSURL)
+        return icon
     }
 }
- 
+
+extension DirectoryItem {
+    var isTextBasedFile: Bool {
+        // Use the already-fetched fileType instead of making another disk access
+        return fileType.conforms(to: .text) ||
+               fileType.conforms(to: .sourceCode) ||
+               fileType.conforms(to: .script) ||
+               fileType.conforms(to: .plainText) ||
+               fileType.conforms(to: .json) ||
+               fileType.conforms(to: .xml) ||
+               fileType.conforms(to: .yaml)
+    }
+}
+

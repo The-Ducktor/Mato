@@ -10,8 +10,6 @@ struct DirectoryView: View {
     var onActivate: (() -> Void)? = nil
 
     @State private var selectedItems: Set<DirectoryItem.ID> = []
-    @State private var quickLookURL: URL?
-    @State private var showQuickLook = false
     @State private var showingRenameAlert = false
     @State private var renameText = ""
     @State private var itemToRename: DirectoryItem?
@@ -132,7 +130,6 @@ struct DirectoryView: View {
                         handleSpaceKeyPress()
                         return .handled
                     }
-                    .quickLookPreview($quickLookURL, in: selectedItemURLs)
 
                 if viewModel.isLoading {
                     LoadingView()
@@ -144,6 +141,7 @@ struct DirectoryView: View {
         }
         .frame(minHeight: 400)
         .focusable()
+        .popoverTip(QuickLookTip(), arrowEdge: .bottom)
         .alert("Rename", isPresented: $viewModel.showingRenameAlert) {
             TextField("Name", text: $viewModel.renameText)
             Button("Cancel", role: .cancel) {}
@@ -207,20 +205,18 @@ struct DirectoryView: View {
     // MARK: - Key Press Actions
 
     private func handleSpaceKeyPress() {
-        guard let firstSelectedId = selectedItems.first,
-            let selectedItem = viewModel.sortedItems.first(where: {
-                $0.id == firstSelectedId
-            })
-        else {
-            return
-        }
-
-        openQuickLook(for: selectedItem.url)
+        guard !selectedItems.isEmpty else { return }
+        
+        let selectedURLs = selectedItemURLs
+        guard !selectedURLs.isEmpty else { return }
+        
+        // Use the shared Quick Look service
+        QuickLookService.shared.showPreview(for: selectedURLs, startingAt: 0)
     }
 
     private func openQuickLook(for url: URL) {
-        quickLookURL = url
-        showQuickLook = true
+        // Use the shared Quick Look service for single file preview
+        QuickLookService.shared.showPreview(for: [url], startingAt: 0)
     }
 }
 
