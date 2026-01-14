@@ -44,13 +44,6 @@ class DirectoryViewModel {
         }
     }
     
-    // Computed property for filtered items based on search
-    var displayedItems: [DirectoryItem] {
-        guard !searchText.isEmpty else { return sortedItems }
-        return sortedItems.filter { item in
-            item.name.localizedCaseInsensitiveContains(searchText)
-        }
-    }
     
     // Per-pane view state
     var viewMode: ViewMode = .list
@@ -168,13 +161,31 @@ class DirectoryViewModel {
     }
 
     private func updateSortedItems() {
-        // Prevent concurrent sorting operations
-        guard !isUpdatingSortedItems else { return }
+        let currentItems = items
+        let currentSortOrder = sortOrder
+        let currentSearchText = searchText
         
-        isUpdatingSortedItems = true
-        defer { isUpdatingSortedItems = false }
-        
-        sortedItems = items.sorted(using: sortOrder)
+        // Use a task to sort in background
+        Task.detached(priority: .userInitiated) {
+            var filtered = currentItems
+            
+            // Apply search filter if active
+            if !currentSearchText.isEmpty {
+                filtered = filtered.filter { item in
+                    item.name.localizedCaseInsensitiveContains(currentSearchText)
+                }
+            }
+            
+            // Sort items
+            let sorted = filtered.sorted(using: currentSortOrder)
+            
+            // Update on main actor
+            await MainActor.run {
+                // Ensure we haven't started another update in the meantime
+                // (though a simple assignment is find here as it's the latest data)
+                self.sortedItems = sorted
+            }
+        }
     }
 
     func setSortOrder(_ newSortOrder: [KeyPathComparator<DirectoryItem>]) {

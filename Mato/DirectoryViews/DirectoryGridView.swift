@@ -1,6 +1,13 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct ItemFramePreferenceKey: PreferenceKey {
+    static let defaultValue: [DirectoryItem.ID: CGRect] = [:]
+    static func reduce(value: inout [DirectoryItem.ID: CGRect], nextValue: () -> [DirectoryItem.ID: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
 struct DirectoryGridView: View {
     var viewModel: DirectoryViewModel
     @Binding var selectedItems: Set<DirectoryItem.ID>
@@ -13,6 +20,12 @@ struct DirectoryGridView: View {
     @FocusState private var isFocused: Bool
     @State private var containerWidth: CGFloat = 800
     @State private var hoverDebounceTask: Task<Void, Never>?
+
+    // Marquee selection state
+    @State private var marqueeStart: CGPoint?
+    @State private var marqueeCurrent: CGPoint?
+    @State private var itemFrames: [DirectoryItem.ID: CGRect] = [:]
+    @State private var initialSelectionAtMarqueeStart: Set<DirectoryItem.ID> = []
 
     // Grid configuration
     private let columns = [
@@ -57,6 +70,14 @@ struct DirectoryGridView: View {
                             quickLookAction: quickLookAction
                         )
                         .id(item.id)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: ItemFramePreferenceKey.self,
+                                    value: [item.id: geo.frame(in: .named("grid"))]
+                                )
+                            }
+                        )
                         .onTapGesture {
                             handleTap(item: item)
                         }
@@ -71,7 +92,50 @@ struct DirectoryGridView: View {
                 }
                 .transaction { t in t.animation = nil } // Disable implicit animations
                 .padding()
+                .background(
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // Clear selection when clicking background
+                            withTransaction(Transaction(animation: nil)) {
+                                selectedItems.removeAll()
+                            }
+                        }
+                )
             }
+            .coordinateSpace(name: "grid")
+            .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
+                itemFrames = frames
+            }
+            .overlay(
+                // Marquee Rectangle
+                Group {
+                    if let start = marqueeStart, let current = marqueeCurrent {
+                        let rect = marqueeRect(from: start, to: current)
+                        Rectangle()
+                            .stroke(Color.accentColor, lineWidth: 1)
+                            .background(Color.accentColor.opacity(0.1))
+                            .frame(width: rect.width, height: rect.height)
+                            .position(x: rect.midX, y: rect.midY)
+                    }
+                }
+            )
+            .gesture(
+                DragGesture(minimumDistance: 5)
+                    .onChanged { value in
+                        if marqueeStart == nil {
+                            marqueeStart = value.startLocation
+                            initialSelectionAtMarqueeStart = selectedItems
+                        }
+                        marqueeCurrent = value.location
+                        updateSelectionForMarquee()
+                    }
+                    .onEnded { _ in
+                        marqueeStart = nil
+                        marqueeCurrent = nil
+                        initialSelectionAtMarqueeStart = []
+                    }
+            )
             .onAppear {
                 containerWidth = geometry.size.width
             }
@@ -249,6 +313,51 @@ struct DirectoryGridView: View {
         }
         return DraggedFiles(urls: urlsToDrag)
     }
+    
+    // MARK: - Marquee Helpers
+    
+    private func marqueeRect(from: CGPoint, to: CGPoint) -> CGRect {
+        CGRect(
+            x: min(from.x, to.x),
+            y: min(from.y, to.y),
+            width: abs(from.x - to.x),
+            height: abs(from.y - to.y)
+        )
+    }
+    
+    private func updateSelectionForMarquee() {
+        guard let start = marqueeStart, let current = marqueeCurrent else { return }
+        let rect = marqueeRect(from: start, to: current)
+        
+        let commandPressed = NSEvent.modifierFlags.contains(.command)
+        let shiftPressed = NSEvent.modifierFlags.contains(.shift)
+        
+        var newSelection = initialSelectionAtMarqueeStart
+        
+        for (id, frame) in itemFrames {
+            if rect.intersects(frame) {
+                newSelection.insert(id)
+            } else if !commandPressed && !shiftPressed {
+                // If not multi-selecting, remove items not in rect
+                if !initialSelectionAtMarqueeStart.contains(id) {
+                    newSelection.remove(id)
+                }
+            }
+        }
+        
+        // Final pass for non-multi-select: only items in rect or previously selected (if multi)
+        if !commandPressed && !shiftPressed {
+            for id in newSelection {
+                if let frame = itemFrames[id], !rect.intersects(frame) {
+                    newSelection.remove(id)
+                }
+            }
+        }
+
+        withTransaction(Transaction(animation: nil)) {
+            selectedItems = newSelection
+        }
+    }
 }
 
 // MARK: - Grid Item View
@@ -410,11 +519,12 @@ struct GridItemView: View {
         .frame(width: 100, height: 100)
         .padding(2)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(backgroundFill)
-                .animation(nil, value: isSelected)
-                .animation(nil, value: isHovered)
-                .animation(nil, value: isDropTargeted)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(borderColor, lineWidth: 1)
+                )
         )
         .contextMenu {
             DirectoryContextMenuItems(
@@ -453,18 +563,24 @@ struct GridItemView: View {
 
     private var backgroundFill: Color {
         if isDropTargeted && item.isDirectory {
-            return Color.accentColor.opacity(0.25)
+            return Color.accentColor.opacity(0.15)
         } else if isSelected {
-            return Color.primary.opacity(0.15)
+            return Color.accentColor.opacity(0.12)
         } else if isHovered {
-            return Color.accentColor.opacity(0.05)
+            return Color.primary.opacity(0.05)
         } else {
             return Color.clear
         }
     }
 
     private var borderColor: Color {
-        isSelected ? Color.accentColor : Color.clear
+        if isDropTargeted && item.isDirectory {
+            return Color.accentColor.opacity(0.5)
+        } else if isSelected {
+            return Color.accentColor.opacity(0.3)
+        } else {
+            return Color.clear
+        }
     }
 
     private func loadFileURLs(from provider: NSItemProvider) async throws

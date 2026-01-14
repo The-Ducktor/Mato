@@ -20,19 +20,18 @@ struct ImageIcon: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .cornerRadius(3)
-            } else if isLoading {
+            } else {
                 ZStack {
                     Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .scaleEffect(0.5)
-                    ProgressView()
-                        .controlSize(.small)
+                        .scaleEffect(isLoading ? 0.5 : 1.0)
+                    
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
                 }
-            } else {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
             }
         }
         .task(id: item.id) {
@@ -45,43 +44,34 @@ struct ImageIcon: View {
     }
     
     private func loadThumbnail() async {
-        // Cancel any existing load task
-        loadTask?.cancel()
-        
         // Skip thumbnail generation for directories or text-based files
         guard !item.isDirectory && !item.isTextBasedFile else {
-            thumbnail = NSWorkspace.shared.icon(forFile: item.url.path)
             return
         }
         
-        // Create a new task that can be cancelled
+        // Cancel existing task if any
+        loadTask?.cancel()
+        
         loadTask = Task {
             isLoading = true
             defer { isLoading = false }
             
             do {
                 let options = SimpleThumbnailLoader.ThumbnailOptions(
-                    size: CGSize(width: 128, height: 128), // Reduced size for grid view
+                    size: CGSize(width: 128, height: 128),
                     scale: 2.0,
                     maintainAspectRatio: true
                 )
-                let url = item.url
                 
-                // Check if task was cancelled
                 try Task.checkCancellation()
+                let loadedThumbnail = try await Self.sharedLoader.generateThumbnail(for: item.url, options: options)
                 
-                // Use shared loader for better cache hit rate
-                let loadedThumbnail = try await Self.sharedLoader.generateThumbnail(for: url, options: options)
-                
-                // Check again before updating state
                 try Task.checkCancellation()
-                
-                thumbnail = loadedThumbnail
-            } catch is CancellationError {
-                // Task was cancelled, do nothing
+                await MainActor.run {
+                    self.thumbnail = loadedThumbnail
+                }
             } catch {
-                // Fallback to system icon on error
-                thumbnail = NSWorkspace.shared.icon(forFile: item.url.path)
+                // Keep default icon on error
             }
         }
         
