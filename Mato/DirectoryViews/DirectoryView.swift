@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 
 struct DirectoryView: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     var onActivate: (() -> Void)? = nil
 
     @State private var selectedItems: Set<DirectoryItem.ID> = []
@@ -30,7 +30,8 @@ struct DirectoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        @Bindable var viewModel = viewModel
+        return VStack(spacing: 0) {
             if let currentDirectory = viewModel.currentDirectory {
                 PathBar(
                     path: currentDirectory,

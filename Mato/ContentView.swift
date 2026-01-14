@@ -9,10 +9,10 @@ import SwiftUI
 
 struct ContentView: View {
   
-    @StateObject private var pinnedFolderStore = PinnedFolderStore.shared
+    @State private var pinnedFolderStore = PinnedFolderStore.shared
     @State private var showingAddPinnedFolderSheet = false
-    @StateObject private var paneManager = PaneManager()
-    @StateObject private var settings = SettingsModel.shared
+    @State private var paneManager = PaneManager()
+    @State private var settings = SettingsModel.shared
 
 
     var body: some View {
@@ -79,7 +79,7 @@ struct ContentView: View {
 
 // MARK: - File Manager Pane Component
 struct FileManagerPane: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     let isActive: Bool
     let onActivate: () -> Void
 
@@ -129,7 +129,7 @@ struct AddPinnedFolderView: View {
     @State private var folderURL: URL?
     @State private var folderName: String = ""
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var pinnedFolderStore = PinnedFolderStore.shared
+    var pinnedFolderStore = PinnedFolderStore.shared
 
     var body: some View {
         VStack {

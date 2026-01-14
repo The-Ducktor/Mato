@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Observation
 
 struct PinnedFolder: Identifiable, Codable, Hashable {
     let id: UUID
@@ -22,9 +23,10 @@ struct PinnedFolder: Identifiable, Codable, Hashable {
 }
 
 @MainActor
-class PinnedFolderStore: ObservableObject {
-    @Published var pinnedFolders: [PinnedFolder] = []
-    private let storeKey = "pinnedFolders"
+@Observable
+class PinnedFolderStore {
+    var pinnedFolders: [PinnedFolder] = []
+    @ObservationIgnored private let storeKey = "pinnedFolders"
     
     static let shared = PinnedFolderStore()
     

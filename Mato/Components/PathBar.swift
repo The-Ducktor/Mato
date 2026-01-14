@@ -10,7 +10,7 @@ import SwiftUI
 struct PathBar: View {
     @State private var isEditing = false
     @State private var pathString: String
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     @State var path: URL
     @FocusState private var isTextFieldFocused: Bool
     

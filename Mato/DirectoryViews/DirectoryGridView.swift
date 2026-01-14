@@ -2,12 +2,12 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct DirectoryGridView: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     @Binding var selectedItems: Set<DirectoryItem.ID>
     @Binding var sortOrder: [KeyPathComparator<DirectoryItem>]
     var quickLookAction: ((URL) -> Void)?
 
-    @StateObject private var audioPlayer = AudioPlayerService.shared
+    @State private var audioPlayer = AudioPlayerService.shared
     @State private var hoveredItemID: DirectoryItem.ID?
     @State private var isDropTargeted: Bool = false
     @FocusState private var isFocused: Bool
@@ -69,6 +69,7 @@ struct DirectoryGridView: View {
                         .draggable(makeDraggedFiles(for: item))
                     }
                 }
+                .transaction { t in t.animation = nil } // Disable implicit animations
                 .padding()
             }
             .onAppear {
@@ -192,10 +193,9 @@ struct DirectoryGridView: View {
     }
 
     private func handleTap(item: DirectoryItem) {
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        
-        withTransaction(transaction) {
+       
+        // Immediate update, no animation delay
+        withTransaction(Transaction(animation: nil)) {
             if NSEvent.modifierFlags.contains(.command) {
                 // Toggle selection
                 if selectedItems.contains(item.id) {
@@ -221,16 +221,14 @@ struct DirectoryGridView: View {
         // Cancel any pending hover task
         hoverDebounceTask?.cancel()
         
-        if hovering {
-            // Set immediately for hover-in
-            hoveredItemID = item.id
-        } else {
-            // Small debounce for hover-out to prevent flicker
-            hoverDebounceTask = Task {
-                try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
-                if !Task.isCancelled {
-                    hoveredItemID = nil
-                }
+        // Immediate update without animation
+        withTransaction(Transaction(animation: nil)) {
+            if hovering {
+                // Set immediately for hover-in
+                hoveredItemID = item.id
+            } else {
+                // Set immediately for hover-out
+                hoveredItemID = nil
             }
         }
     }
@@ -262,7 +260,7 @@ struct GridItemView: View {
     @Binding var selectedItems: Set<DirectoryItem.ID>
     var quickLookAction: ((URL) -> Void)?
 
-    @ObservedObject private var audioPlayer = AudioPlayerService.shared
+    var audioPlayer = AudioPlayerService.shared
     @State private var isDropTargeted = false
     @State private var showProgressRing = false
     @State private var isPressed = false
@@ -414,8 +412,9 @@ struct GridItemView: View {
         .background(
             RoundedRectangle(cornerRadius: 8)
                 .fill(backgroundFill)
-                .animation(.linear(duration: 0.1), value: isSelected)
-                .animation(.linear(duration: 0.1), value: isHovered)
+                .animation(nil, value: isSelected)
+                .animation(nil, value: isHovered)
+                .animation(nil, value: isDropTargeted)
         )
         .contextMenu {
             DirectoryContextMenuItems(

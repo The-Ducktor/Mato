@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DirectoryContextMenuItems: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     let ids: Set<DirectoryItem.ID>
     let quickLookAction: ((URL) -> Void)?
     
@@ -128,7 +128,7 @@ struct DirectoryContextMenuItems: View {
 
 
 struct DirectoryContextMenu: ViewModifier {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     let ids: Set<DirectoryItem.ID>
     let quickLookAction: (URL) -> Void
 

@@ -1,8 +1,10 @@
 import Foundation
 @preconcurrency import QuickLookThumbnailing
 import AppKit
+import Observation
 
-final class SimpleThumbnailLoader: ObservableObject, @unchecked Sendable {
+@Observable
+final class SimpleThumbnailLoader: @unchecked Sendable {
     
     // MARK: - Types
     

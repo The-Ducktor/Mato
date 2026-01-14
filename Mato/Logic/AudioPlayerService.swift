@@ -8,18 +8,20 @@
 import Foundation
 import AVFoundation
 import UniformTypeIdentifiers
+import Observation
 
 @MainActor
-class AudioPlayerService: ObservableObject {
+@Observable
+class AudioPlayerService {
     static let shared = AudioPlayerService()
     
-    @Published var currentlyPlayingURL: URL?
-    @Published var isPlaying: Bool = false
-    @Published var currentTime: TimeInterval = 0
-    @Published var duration: TimeInterval = 0
+    var currentlyPlayingURL: URL?
+    var isPlaying: Bool = false
+    var currentTime: TimeInterval = 0
+    var duration: TimeInterval = 0
     
-    private var audioPlayer: AVAudioPlayer?
-    private var progressTimer: Timer?
+    @ObservationIgnored private var audioPlayer: AVAudioPlayer?
+    @ObservationIgnored private var progressTimer: Timer?
     
     private init() {}
     

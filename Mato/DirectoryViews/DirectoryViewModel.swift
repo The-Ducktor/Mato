@@ -8,35 +8,37 @@
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
+import Observation
 
 @MainActor
-class DirectoryViewModel: ObservableObject {
+@Observable
+class DirectoryViewModel {
     // Sorting and sortedItems are now managed reactively and debounced for UI safety.
-    @Published var items: [DirectoryItem] = [] {
+    var items: [DirectoryItem] = [] {
         didSet {
             // Immediately update sortedItems when items change to prevent index out of bounds
             updateSortedItems()
         }
     }
-    @Published var sortedItems: [DirectoryItem] = []
-    @Published var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod) {
+    var sortedItems: [DirectoryItem] = []
+    var sortOrder: [KeyPathComparator<DirectoryItem>] = SettingsModel.keyPathComparator(for: SettingsModel.shared.defaultSortMethod) {
         didSet {
             // Immediately update sortedItems when sort order changes
             updateSortedItems()
         }
     }
 
-    @Published var currentDirectory: URL?
-    @Published var navigationStack: [URL] = []
-    @Published var forwardStack: [URL] = []
-    @Published var isLoading: Bool = false
-    @Published var errorMessage: String?
-    @Published var pathString: String = ""
-    @Published var hideHiddenFiles: Bool = true
+    var currentDirectory: URL?
+    var navigationStack: [URL] = []
+    var forwardStack: [URL] = []
+    var isLoading: Bool = false
+    var errorMessage: String?
+    var pathString: String = ""
+    var hideHiddenFiles: Bool = true
     
     // Search properties
-    @Published var isSearching: Bool = false
-    @Published var searchText: String = "" {
+    var isSearching: Bool = false
+    var searchText: String = "" {
         didSet {
             updateSortedItems()
         }
@@ -51,28 +53,28 @@ class DirectoryViewModel: ObservableObject {
     }
     
     // Per-pane view state
-    @Published var viewMode: ViewMode = .list
-    @Published var currentSortMethod: String = "date"
-    @Published var sortAscending: Bool = false
+    var viewMode: ViewMode = .list
+    var currentSortMethod: String = "date"
+    var sortAscending: Bool = false
 
     // Rename alert state
-    @Published var showingRenameAlert = false
-    @Published var renameText = ""
-    @Published var itemToRename: DirectoryItem? = nil
+    var showingRenameAlert = false
+    var renameText = ""
+    var itemToRename: DirectoryItem? = nil
     
     // File conflict alert state
-    @Published var showingFileConflictAlert = false
-    @Published var conflictMessage = ""
-    private var pendingMoveOperation: (() -> Void)?
+    var showingFileConflictAlert = false
+    var conflictMessage = ""
+    @ObservationIgnored private var pendingMoveOperation: (() -> Void)?
 
-    private let fileManager = FileManagerService.shared
-    private let preferencesManager = DirectoryPreferencesManager.shared
+    @ObservationIgnored private let fileManager = FileManagerService.shared
+    @ObservationIgnored private let preferencesManager = DirectoryPreferencesManager.shared
 
     // Directory watching service
-    private var directoryWatcherService: DirectoryWatcherService?
+    @ObservationIgnored private var directoryWatcherService: DirectoryWatcherService?
     
     // Flag to prevent concurrent sorting operations
-    private var isUpdatingSortedItems = false
+    @ObservationIgnored private var isUpdatingSortedItems = false
 
     init() {
         // Use default folder from settings

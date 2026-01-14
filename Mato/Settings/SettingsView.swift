@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct SettingsView: View {
-    @StateObject private var settings = SettingsModel.shared
+    @State private var settings = SettingsModel.shared
     @State private var folderPath: String
     @State private var showingFolderPicker = false
     @State private var sliderValue: Double
@@ -13,6 +13,7 @@ struct SettingsView: View {
     }
     
     var body: some View {
+        @Bindable var settings = settings
         ScrollView {
             VStack(spacing: 0) {
                 // Header - Clean and minimal like Safari preferences

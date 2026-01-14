@@ -14,7 +14,7 @@ struct DraggedFiles: Transferable {
 }
 
 struct DirectoryTableView: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     @Binding var selectedItems: Set<DirectoryItem.ID>
     @Binding var sortOrder: [KeyPathComparator<DirectoryItem>]
     @State private var color: Color = .clear // testing
@@ -247,7 +247,7 @@ struct DirectoryTableView: View {
 // Separate view component for Name cell to properly handle @State
 struct NameCellView: View {
     let item: DirectoryItem
-    let viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     let selectedItems: Set<DirectoryItem.ID>
     @Binding var hoveredFolderID: DirectoryItem.ID?
     @Binding var color: Color

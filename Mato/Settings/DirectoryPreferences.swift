@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import Observation
 
 // MARK: - View Mode Enum
 enum ViewMode: String, Codable {
@@ -29,11 +30,12 @@ struct DirectoryPreference: Codable {
 
 // MARK: - Directory Preferences Manager
 @MainActor
-class DirectoryPreferencesManager: ObservableObject {
+@Observable
+class DirectoryPreferencesManager {
     static let shared = DirectoryPreferencesManager()
     
-    private let userDefaults = UserDefaults.standard
-    private let preferencesKey = "directoryPreferences"
+    @ObservationIgnored private let userDefaults = UserDefaults.standard
+    @ObservationIgnored private let preferencesKey = "directoryPreferences"
     
     // In-memory cache
     private var preferences: [String: DirectoryPreference] = [:]

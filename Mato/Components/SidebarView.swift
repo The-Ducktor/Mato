@@ -8,8 +8,8 @@
 import SwiftUI
 
 struct SidebarView: View {
-    @ObservedObject var paneManager: PaneManager
-    @ObservedObject var pinnedFolderStore: PinnedFolderStore
+    var paneManager: PaneManager
+    var pinnedFolderStore: PinnedFolderStore
     @Binding var showingAddPinnedFolderSheet: Bool
     
     var body: some View {
@@ -27,7 +27,7 @@ struct SidebarView: View {
 
 // MARK: - Quick Access Section
 struct QuickAccessSection: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     
     var body: some View {
         Section("Quick Access") {
@@ -53,8 +53,8 @@ struct QuickAccessSection: View {
 
 // MARK: - Pinned Folders Section
 struct PinnedFoldersSection: View {
-    @ObservedObject var paneManager: PaneManager
-    @ObservedObject var pinnedFolderStore: PinnedFolderStore
+    var paneManager: PaneManager
+    var pinnedFolderStore: PinnedFolderStore
     @State private var draggedFolderIndex: Int?
     
     var body: some View {
@@ -87,7 +87,7 @@ struct PinnedFoldersSection: View {
 
 // MARK: - Panes Section
 struct PanesSection: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     @State private var draggedPaneIndex: Int?
     
     var body: some View {
@@ -112,7 +112,7 @@ struct PanesSection: View {
 // MARK: - Pane Row (Draggable)
 struct PaneRow: View {
     let index: Int
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     @Binding var draggedPaneIndex: Int?
     @State private var isDropTarget = false
     
@@ -217,8 +217,8 @@ struct PaneRow: View {
 struct PinnedFolderRow: View {
     let folder: PinnedFolder
     let index: Int
-    @ObservedObject var paneManager: PaneManager
-    @ObservedObject var pinnedFolderStore: PinnedFolderStore
+    var paneManager: PaneManager
+    var pinnedFolderStore: PinnedFolderStore
     @Binding var draggedFolderIndex: Int?
     @State private var isDropTarget = false
     @State private var showingIconPicker = false

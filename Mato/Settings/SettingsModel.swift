@@ -3,16 +3,18 @@
 import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
+import Observation
 
 @MainActor
-class SettingsModel: ObservableObject {
+@Observable
+class SettingsModel {
     static let shared = SettingsModel()
     
-    @AppStorage("defaultSortMethod") var defaultSortMethod: String = "date"
-    @AppStorage("defaultFolder") var defaultFolder: String = FileManager.default.homeDirectoryForCurrentUser.path
-    @AppStorage("defaultPaneCount") var defaultPaneCount: Int = 2
-    @AppStorage("viewMode") var viewMode: String = "list"
-    @AppStorage("useSavedViewMode") var useSavedViewMode: Bool = true
+    @ObservationIgnored @AppStorage("defaultSortMethod") var defaultSortMethod: String = "date"
+    @ObservationIgnored @AppStorage("defaultFolder") var defaultFolder: String = FileManager.default.homeDirectoryForCurrentUser.path
+    @ObservationIgnored @AppStorage("defaultPaneCount") var defaultPaneCount: Int = 2
+    @ObservationIgnored @AppStorage("viewMode") var viewMode: String = "list"
+    @ObservationIgnored @AppStorage("useSavedViewMode") var useSavedViewMode: Bool = true
     
     let sortMethods: [String] = ["name", "date", "size", "type","created"]
     

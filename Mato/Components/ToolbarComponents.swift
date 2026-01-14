@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - Layout Menu
 struct LayoutMenu: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     
     var body: some View {
         Menu {
@@ -61,7 +61,7 @@ struct LayoutMenu: View {
 
 // MARK: - Pane Controls
 struct PaneControls: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     
     var body: some View {
         Group {
@@ -112,7 +112,7 @@ struct SearchBar: View {
 
 // MARK: - View Mode Toggle (Per-Pane)
 struct ViewModeToggle: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     
     var body: some View {
         Group {
@@ -138,7 +138,7 @@ struct ViewModeToggle: View {
 
 // MARK: - Sort Menu (Per-Pane)
 struct SortMenu: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     
     var body: some View {
         Group {
