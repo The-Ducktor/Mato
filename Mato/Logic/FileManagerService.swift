@@ -47,6 +47,9 @@ final class FileManagerService: @unchecked Sendable {
         await taskManager.cancelPendingOperations(for: directory)
         
         let task = Task.detached(priority: .userInitiated) { [self, fileManager] in
+            // contentsOfDirectory(includingPropertiesForKeys:) pre-populates the URL
+            // resource cache for each key — calling url.resourceValues(forKeys:) again
+            // per file would re-fetch the same data from disk unnecessarily.
             let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [
                 .isDirectoryKey,
                 .fileSizeKey,
@@ -60,10 +63,10 @@ final class FileManagerService: @unchecked Sendable {
             ])
 
             var items: [DirectoryItem] = []
-            // Process items with lower priority to keep UI responsive
             for url in contents {
                 try Task.checkCancellation()
                 do {
+                    // Read from the already-populated URL resource cache.
                     let resourceValues = try url.resourceValues(forKeys: [
                         .isDirectoryKey,
                         .fileSizeKey,
@@ -84,8 +87,8 @@ final class FileManagerService: @unchecked Sendable {
             return items
         }
         
-        // Track the task for cancellation
-        await taskManager.trackTask(Task { _ = try? await task.value }, for: directory)
+        // Track the real task so cancellation actually works.
+        await taskManager.trackTask(task, for: directory)
         
         return try await task.value
     }

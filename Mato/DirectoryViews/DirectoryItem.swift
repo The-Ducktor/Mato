@@ -65,7 +65,9 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
         DataRepresentation(contentType: .fileURL) {
             $0.url.dataRepresentation
         } importing: { data in
-            let url = URL(dataRepresentation: data, relativeTo: nil)!
+            guard let url = URL(dataRepresentation: data, relativeTo: nil) else {
+                throw CocoaError(.fileReadInvalidFileName)
+            }
             return try await FileManagerService.shared.getDirectoryItem(for: url)
         }
     }

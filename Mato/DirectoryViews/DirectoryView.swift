@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 
 struct DirectoryView: View {
-    var viewModel: DirectoryViewModel
+    @Bindable var viewModel: DirectoryViewModel
     var onActivate: (() -> Void)? = nil
 
     @State private var selectedItems: Set<DirectoryItem.ID> = []
@@ -28,7 +28,6 @@ struct DirectoryView: View {
     }
 
     var body: some View {
-        @Bindable var viewModel = viewModel
         return VStack(spacing: 0) {
             if let currentDirectory = viewModel.currentDirectory {
                 PathBar(
@@ -55,16 +54,16 @@ struct DirectoryView: View {
             if let error = viewModel.errorMessage {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
                     Text(error)
                         .font(.caption)
-                        .foregroundColor(.primary)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button(action: {
                         viewModel.errorMessage = nil
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -217,13 +216,5 @@ struct DirectoryView: View {
     private func openQuickLook(for url: URL) {
         // Use the shared Quick Look service for single file preview
         QuickLookService.shared.showPreview(for: [url], startingAt: 0)
-    }
-}
-
-extension DirectoryViewModel {
-    func refreshCurrentDirectory() {
-        if let currentDir = currentDirectory {
-            loadDirectory(at: currentDir)
-        }
     }
 }

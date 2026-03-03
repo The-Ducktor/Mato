@@ -260,7 +260,7 @@ struct DirectoryTableView: View {
                 var files: [URL] = []
 
                 for provider in providers {
-                    if let urls = try? await loadFileURLs(from: provider) {
+                    if let urls = try? await provider.loadFileURLs() {
                         for url in urls {
                             if item.url == url {
                                 continue
@@ -277,52 +277,7 @@ struct DirectoryTableView: View {
                     color = .green
                 }
             }
-            return true
-        }
-        .onChange(of: isRowTargeted) { _, newValue in
-            if newValue && item.isDirectory {
-                hoveredFolderID = item.id
-            } else if hoveredFolderID == item.id {
-                hoveredFolderID = nil
-            }
-        }
-    }
-    
-    private func loadFileURLs(from provider: NSItemProvider) async throws -> [URL] {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                if let url = data as? URL {
-                    continuation.resume(returning: [url])
-                    return
-                }
-                
-                if let data = data as? Data {
-                    // Try to unarchive an ARRAY of URLs first (multi-select case)
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
-                        continuation.resume(returning: urls)
-                        return
-                    }
-                    
-                    // Try to unarchive a single URL
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                    
-                    // Fallback: try URL(dataRepresentation:)
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                }
-                
-                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
-            }
+        return true
         }
     }
 }
@@ -340,7 +295,7 @@ struct TableDropDelegate: DropDelegate {
             var urls: [URL] = []
             
             for itemProvider in itemProviders {
-                if let urlsFromProvider = try? await loadFileURLs(from: itemProvider) {
+                if let urlsFromProvider = try? await itemProvider.loadFileURLs() {
                     urls.append(contentsOf: urlsFromProvider)
                 }
             }

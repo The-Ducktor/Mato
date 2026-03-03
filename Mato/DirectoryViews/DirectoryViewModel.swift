@@ -68,6 +68,10 @@ class DirectoryViewModel {
     
     // Flag to prevent concurrent sorting operations
     @ObservationIgnored private var isUpdatingSortedItems = false
+    /// Tracks the most recent sort task so we can cancel it when new sort/nav
+    /// events arrive — prevents stale results from a slow task overwriting
+    /// fresher data.
+    @ObservationIgnored private var currentSortTask: Task<Void, Never>?
 
     // MARK: - Preload Cache
     // LRU-evicted cache of directory contents fetched on hover, before navigation.
@@ -82,7 +86,7 @@ class DirectoryViewModel {
         let defaultURL = SettingsModel.shared.defaultFolderURL
         navigationStack = [defaultURL]
         currentDirectory = defaultURL  // Set immediately to prevent showing wrong directory
-        pathString = defaultURL.path
+        pathString = defaultURL.path(percentEncoded: false)
         loadDirectory(at: defaultURL)
     }
 
@@ -94,7 +98,7 @@ class DirectoryViewModel {
     func preloadDirectory(at url: URL) {
         // Only preload actual directories
         var isDir: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else { return }
+        guard FileManager.default.fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDir), isDir.boolValue else { return }
 
         // Skip if already cached
         if preloadCache[url] != nil { return }
@@ -186,7 +190,7 @@ class DirectoryViewModel {
 
         // Update currentDirectory and pathString immediately to prevent showing wrong directory
         currentDirectory = url
-        pathString = url.path
+        pathString = url.path(percentEncoded: false)
 
         // Cancel any in-flight preload for this URL — we're doing a real navigation now
         preloadTasks[url]?.cancel()
@@ -243,7 +247,7 @@ class DirectoryViewModel {
                     self.isLoading = false
 
                     if let currentDir = self.currentDirectory {
-                        self.pathString = currentDir.path
+                        self.pathString = currentDir.path(percentEncoded: false)
                     }
                 }
             }
@@ -251,31 +255,36 @@ class DirectoryViewModel {
     }
 
     private func updateSortedItems() {
+        // Cancel any in-flight sort so stale results never overwrite fresher data.
+        currentSortTask?.cancel()
+
         let currentItems = items
         let currentSortOrder = sortOrder
         let currentSearchText = searchText
-        
-        // Use a task to sort in background
-        Task.detached(priority: .userInitiated) {
+
+        let task = Task.detached(priority: .userInitiated) {
             var filtered = currentItems
-            
+
             // Apply search filter if active
             if !currentSearchText.isEmpty {
                 filtered = filtered.filter { item in
                     item.name.localizedCaseInsensitiveContains(currentSearchText)
                 }
             }
-            
+
+            guard !Task.isCancelled else { return }
+
             // Sort items
             let sorted = filtered.sorted(using: currentSortOrder)
-            
+
+            guard !Task.isCancelled else { return }
+
             // Update on main actor
             await MainActor.run {
-                // Ensure we haven't started another update in the meantime
-                // (though a simple assignment is find here as it's the latest data)
                 self.sortedItems = sorted
             }
         }
+        currentSortTask = task
     }
 
     func setSortOrder(_ newSortOrder: [KeyPathComparator<DirectoryItem>]) {
@@ -378,10 +387,10 @@ class DirectoryViewModel {
     func navigateToPath(_ path: String) {
         guard !path.isEmpty else { return }
 
-        let url = URL(fileURLWithPath: path)
+        let url = URL(filePath: path)
         var isDir: ObjCBool = false
 
-        if FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue {
+        if FileManager.default.fileExists(atPath: url.path(percentEncoded: false), isDirectory: &isDir), isDir.boolValue {
             // Valid directory, navigate to it
             // Reset navigation stack to just this path
             // (since we don't know the hierarchy when manually entering a path)
@@ -394,16 +403,21 @@ class DirectoryViewModel {
 
             // Reset displayed path to current directory
             if let current = currentDirectory {
-                pathString = current.path
+                pathString = current.path(percentEncoded: false)
             }
         }
     }
 
+    // Cached formatter — ByteCountFormatter is expensive to construct.
+    nonisolated(unsafe) private static let byteCountFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.allowedUnits = [.useKB, .useMB, .useGB, .useBytes]
+        f.countStyle = .file
+        return f
+    }()
+
     func formatFileSize(_ size: Int) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.allowedUnits = [.useKB, .useMB, .useGB, .useBytes]
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: Int64(size))
+        Self.byteCountFormatter.string(fromByteCount: Int64(size))
     }
 
     // MARK: - Context Menu Actions
@@ -423,10 +437,12 @@ class DirectoryViewModel {
                 item.isDirectory
                 ? item.url : item.url.deletingLastPathComponent()
 
+            let escapedPath = targetURL.path(percentEncoded: false)
+                .replacingOccurrences(of: "'", with: "\\'")
             let script = """
                     tell application "Terminal"
                         activate
-                        do script "cd '\(targetURL.path.replacingOccurrences(of: "'", with: "\\'"))'"
+                        do script "cd '\(escapedPath)'"
                     end tell
                 """
 
@@ -453,15 +469,22 @@ class DirectoryViewModel {
         let newURL = item.url.deletingLastPathComponent()
             .appendingPathComponent(renameText)
 
-        do {
-            try FileManager.default.moveItem(at: item.url, to: newURL)
-            refreshCurrentDirectory()
-        } catch {
-            print("Failed to rename: \(error)")
-        }
-
+        let sourceURL = item.url
         itemToRename = nil
         renameText = ""
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                try FileManager.default.moveItem(at: sourceURL, to: newURL)
+            } catch {
+                await MainActor.run {
+                    print("Failed to rename: \(error)")
+                }
+            }
+            // Directory watcher will pick up the change; explicit refresh is a
+            // safety net in case the watcher fires before the file is visible.
+            await MainActor.run { self.refreshCurrentDirectory() }
+        }
     }
 
     func copyItems(_ ids: Set<DirectoryItem.ID>) {
@@ -494,19 +517,21 @@ class DirectoryViewModel {
                 as? [URL]
         else { return }
 
-        for url in urls {
-            let destinationURL = currentDir.appendingPathComponent(
-                url.lastPathComponent
-            )
-
-            do {
-                try FileManager.default.copyItem(at: url, to: destinationURL)
-            } catch {
-                print("Failed to paste: \(error)")
+        Task.detached(priority: .userInitiated) {
+            for url in urls {
+                let destinationURL = currentDir.appendingPathComponent(
+                    url.lastPathComponent
+                )
+                do {
+                    try FileManager.default.copyItem(at: url, to: destinationURL)
+                } catch {
+                    await MainActor.run {
+                        print("Failed to paste: \(error)")
+                    }
+                }
             }
+            await MainActor.run { self.refreshCurrentDirectory() }
         }
-
-        refreshCurrentDirectory()
     }
 
     func hasItemsInPasteboard() -> Bool {
@@ -516,7 +541,7 @@ class DirectoryViewModel {
 
     func copyPaths(_ ids: Set<DirectoryItem.ID>) {
         let paths = ids.compactMap { id in
-            getItem(id)?.url.path
+            getItem(id)?.url.path(percentEncoded: false)
         }.joined(separator: "\n")
 
         NSPasteboard.general.clearContents()
@@ -525,7 +550,7 @@ class DirectoryViewModel {
 
     func copyAsPathname(_ ids: Set<DirectoryItem.ID>) {
         let paths = ids.compactMap { id in
-            getItem(id)?.url.standardizedFileURL.path
+            getItem(id)?.url.standardizedFileURL.path(percentEncoded: false)
         }.joined(separator: "\n")
 
         NSPasteboard.general.clearContents()
@@ -564,7 +589,7 @@ class DirectoryViewModel {
         {
             NSWorkspace.shared.selectFile(
                 nil,
-                inFileViewerRootedAtPath: item.url.path
+                inFileViewerRootedAtPath: item.url.path(percentEncoded: false)
             )
         }
     }
@@ -582,22 +607,29 @@ class DirectoryViewModel {
 
     func compressItems(_ ids: Set<DirectoryItem.ID>) {
         let urls = getURLs(from: ids)
-
-        let task = Process()
-        task.launchPath = "/usr/bin/ditto"
-        task.arguments =
-            ["-c", "-k", "--sequesterRsrc", "--keepParent"] + urls.map(\.path)
-            + ["Archive.zip"]
-        task.currentDirectoryPath =
-            currentDirectory?.path
+        let workingDir = currentDirectory?.path(percentEncoded: false)
             ?? FileManager.default.currentDirectoryPath
 
-        do {
-            try task.run()
-            task.waitUntilExit()
-            refreshCurrentDirectory()
-        } catch {
-            print("Failed to compress: \(error)")
+        // Run ditto on a background thread — waitUntilExit() blocks the calling
+        // thread, so this must never be called on the main thread.
+        Task.detached(priority: .userInitiated) {
+            let task = Process()
+            task.launchPath = "/usr/bin/ditto"
+            task.arguments =
+                ["-c", "-k", "--sequesterRsrc", "--keepParent"]
+                + urls.map { $0.path(percentEncoded: false) }
+                + ["Archive.zip"]
+            task.currentDirectoryPath = workingDir
+
+            do {
+                try task.run()
+                task.waitUntilExit()
+            } catch {
+                await MainActor.run {
+                    print("Failed to compress: \(error)")
+                }
+            }
+            await MainActor.run { self.refreshCurrentDirectory() }
         }
     }
 
@@ -629,18 +661,21 @@ class DirectoryViewModel {
     func moveToTrash(_ ids: Set<DirectoryItem.ID>) {
         let urls = getURLs(from: ids)
 
-        for url in urls {
-            do {
-                try FileManager.default.trashItem(
-                    at: url,
-                    resultingItemURL: nil
-                )
-            } catch {
-                print("Failed to move to trash: \(error)")
+        Task.detached(priority: .userInitiated) {
+            for url in urls {
+                do {
+                    try FileManager.default.trashItem(
+                        at: url,
+                        resultingItemURL: nil
+                    )
+                } catch {
+                    await MainActor.run {
+                        print("Failed to move to trash: \(error)")
+                    }
+                }
             }
+            await MainActor.run { self.refreshCurrentDirectory() }
         }
-
-        refreshCurrentDirectory()
     }
 
     func showServices(_ ids: Set<DirectoryItem.ID>) {
@@ -795,4 +830,10 @@ class DirectoryViewModel {
 
     // MARK: - Directory Watching
     // (All logic now handled by DirectoryWatcherService)
+
+    func refreshCurrentDirectory() {
+        if let currentDir = currentDirectory {
+            loadDirectory(at: currentDir)
+        }
+    }
 }

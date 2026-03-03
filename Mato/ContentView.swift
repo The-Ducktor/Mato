@@ -55,7 +55,7 @@ struct ContentView: View {
         guard paneManager.panes.isEmpty else { return }
         
         let count = settings.defaultPaneCount
-        let defaultURL = URL(fileURLWithPath: settings.defaultFolder)
+        let defaultURL = URL(filePath: settings.defaultFolder)
         
         for _ in 0..<count {
             paneManager.addPane()
@@ -128,6 +128,7 @@ struct FileManagerPane: View {
 struct AddPinnedFolderView: View {
     @State private var folderURL: URL?
     @State private var folderName: String = ""
+    @State private var showingFolderPicker = false
     @Environment(\.dismiss) private var dismiss
     var pinnedFolderStore = PinnedFolderStore.shared
 
@@ -142,22 +143,12 @@ struct AddPinnedFolderView: View {
                     Text("Folder:")
                     Spacer()
                     Button("Choose Folder") {
-                        let panel = NSOpenPanel()
-                        panel.canChooseFiles = false
-                        panel.canChooseDirectories = true
-                        panel.allowsMultipleSelection = false
-
-                        if panel.runModal() == .OK {
-                            folderURL = panel.url
-                            if folderName.isEmpty {
-                                folderName = folderURL?.lastPathComponent ?? ""
-                            }
-                        }
+                        showingFolderPicker = true
                     }
                 }
 
                 if let url = folderURL {
-                    Text(url.path)
+                    Text(url.path(percentEncoded: false))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
@@ -169,6 +160,23 @@ struct AddPinnedFolderView: View {
                     .padding(.vertical)
             }
             .padding()
+            .fileImporter(
+                isPresented: $showingFolderPicker,
+                allowedContentTypes: [.folder],
+                allowsMultipleSelection: false
+            ) { result in
+                switch result {
+                case .success(let urls):
+                    if let url = urls.first {
+                        folderURL = url
+                        if folderName.isEmpty {
+                            folderName = url.lastPathComponent
+                        }
+                    }
+                case .failure(let error):
+                    print("Folder selection error: \(error.localizedDescription)")
+                }
+            }
 
             HStack {
                 Button("Cancel") {

@@ -12,6 +12,10 @@ struct IconPickerView: View {
     let onSelect: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var searchText = ""
+    /// Debounced copy of searchText — updated 200 ms after the user stops typing
+    /// so filteredIcons isn't recomputed on every keystroke.
+    @State private var debouncedSearch = ""
+    @State private var debounceTask: Task<Void, Never>?
     @State private var allIcons: [String] = []
     
     init(selectedIcon: String, onSelect: @escaping (String) -> Void) {
@@ -34,10 +38,10 @@ struct IconPickerView: View {
             categoryFiltered = iconsByCategory.first(where: { $0.0 == selectedCategory })?.1 ?? []
         }
         
-        if searchText.isEmpty {
+        if debouncedSearch.isEmpty {
             return categoryFiltered
         } else {
-            return categoryFiltered.filter { $0.localizedCaseInsensitiveContains(searchText) }
+            return categoryFiltered.filter { $0.localizedCaseInsensitiveContains(debouncedSearch) }
         }
     }
     
@@ -136,9 +140,18 @@ struct IconPickerView: View {
                     TextField("Search icons...", text: $searchText)
                         .textFieldStyle(.plain)
                         .font(.system(size: 11))
+                        .onChange(of: searchText) { _, newValue in
+                            debounceTask?.cancel()
+                            debounceTask = Task { @MainActor in
+                                try? await Task.sleep(for: .milliseconds(200))
+                                guard !Task.isCancelled else { return }
+                                debouncedSearch = newValue
+                            }
+                        }
                     if !searchText.isEmpty {
                         Button {
                             searchText = ""
+                            debouncedSearch = ""
                         } label: {
                             Image(systemName: "xmark.circle.fill")
                                 .font(.system(size: 11))

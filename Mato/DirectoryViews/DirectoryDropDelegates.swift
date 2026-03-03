@@ -2,6 +2,57 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Shared NSItemProvider URL loading
+
+extension NSItemProvider {
+    /// Loads all file URLs from a drag-and-drop item provider.
+    /// Handles the three encodings produced by SwiftUI drag sources:
+    ///   1. A bare `URL` value
+    ///   2. An `NSKeyedArchiver`-encoded array of `NSURL`s (multi-select)
+    ///   3. An `NSKeyedArchiver`-encoded single `NSURL`
+    ///   4. A `URL.dataRepresentation` byte blob (fallback)
+    func loadFileURLs() async throws -> [URL] {
+        try await withCheckedThrowingContinuation { continuation in
+            loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+
+                if let url = data as? URL {
+                    continuation.resume(returning: [url])
+                    return
+                }
+
+                if let data = data as? Data {
+                    // Multi-select case: array of NSURLs archived by SwiftUI
+                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(
+                        ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
+                        continuation.resume(returning: urls)
+                        return
+                    }
+                    // Single URL archived by NSKeyedArchiver
+                    if let url = try? NSKeyedUnarchiver.unarchivedObject(
+                        ofClass: NSURL.self, from: data) as? URL {
+                        continuation.resume(returning: [url])
+                        return
+                    }
+                    // Fallback: raw URL data representation
+                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
+                        continuation.resume(returning: [url])
+                        return
+                    }
+                }
+
+                continuation.resume(throwing: NSError(
+                    domain: "InvalidData", code: 0,
+                    userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]
+                ))
+            }
+        }
+    }
+}
+
 // MARK: - Drop Delegates
 
 struct DirectoryDropDelegate: DropDelegate {
@@ -18,7 +69,7 @@ struct DirectoryDropDelegate: DropDelegate {
             print("🔍 DROP DEBUG: Got \(itemProviders.count) item providers")
             
             for (index, itemProvider) in itemProviders.enumerated() {
-                let urls = try? await loadFileURLs(from: itemProvider)
+                let urls = try? await itemProvider.loadFileURLs()
                 if let urls = urls {
                     print("  Provider [\(index)] returned \(urls.count) URLs:")
                     for url in urls {
@@ -45,45 +96,6 @@ struct DirectoryDropDelegate: DropDelegate {
 
         return true
     }
-    
-    private func loadFileURLs(from provider: NSItemProvider) async throws -> [URL] {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                // Handle different data types
-                if let url = data as? URL {
-                    continuation.resume(returning: [url])
-                    return
-                }
-                
-                if let data = data as? Data {
-                    // Try to unarchive an ARRAY of URLs first (multi-select case)
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
-                        continuation.resume(returning: urls)
-                        return
-                    }
-                    
-                    // Try to unarchive a single URL
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                    
-                    // Fallback: try URL(dataRepresentation:)
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                }
-                
-                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
-            }
-        }
-    }
 }
 
 struct ItemDropDelegate: DropDelegate {
@@ -105,7 +117,7 @@ struct ItemDropDelegate: DropDelegate {
             print("🔍 ITEM DROP DEBUG: Got \(itemProviders.count) item providers")
             
             for (index, itemProvider) in itemProviders.enumerated() {
-                let urls = try? await loadFileURLs(from: itemProvider)
+                let urls = try? await itemProvider.loadFileURLs()
                 if let urls = urls {
                     print("  Provider [\(index)] returned \(urls.count) URLs:")
                     for url in urls {
@@ -131,44 +143,5 @@ struct ItemDropDelegate: DropDelegate {
         }
 
         return true
-    }
-    
-    private func loadFileURLs(from provider: NSItemProvider) async throws -> [URL] {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                // Handle different data types
-                if let url = data as? URL {
-                    continuation.resume(returning: [url])
-                    return
-                }
-                
-                if let data = data as? Data {
-                    // Try to unarchive an ARRAY of URLs first (multi-select case)
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
-                        continuation.resume(returning: urls)
-                        return
-                    }
-                    
-                    // Try to unarchive a single URL
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                    
-                    // Fallback: try URL(dataRepresentation:)
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                }
-                
-                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
-            }
-        }
     }
 }

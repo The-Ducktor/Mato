@@ -87,29 +87,6 @@ struct PaneControls: View {
     }
 }
 
-// MARK: - Search Bar
-struct SearchBar: View {
-    @Binding var searchText: String
-    
-    var body: some View {
-        HStack {
-            TextField("Search", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 200, maxWidth: 400)
-            
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-    }
-}
-
 // MARK: - View Mode Toggle (Per-Pane)
 struct ViewModeToggle: View {
     var paneManager: PaneManager
@@ -206,16 +183,18 @@ struct SortMenu: View {
     }
     
     private func sortIcon(for method: String, ascending: Bool) -> String {
-        let baseIcon: String
         switch method {
-        case "name": baseIcon = "textformat"
-        case "date", "created": baseIcon = "calendar"
-        case "size": baseIcon = "arrow.up.arrow.down"
-        case "type": baseIcon = "doc"
-        default: baseIcon = "arrow.up.arrow.down"
+        case "name":
+            return ascending ? "textformat.characters.ascending" : "textformat.characters.descending"
+        case "date", "created":
+            return ascending ? "arrow.up.circle" : "arrow.down.circle"
+        case "size":
+            return ascending ? "arrow.up.arrow.down.circle" : "arrow.up.arrow.down"
+        case "type":
+            return ascending ? "doc.badge.arrow.up" : "doc"
+        default:
+            return ascending ? "arrow.up" : "arrow.down"
         }
-        
-        return ascending ? "\(baseIcon)" : "\(baseIcon)"
     }
 }
 

@@ -9,14 +9,12 @@ import SwiftUI
 
 @main
 struct MatoApp: App {
-    init() {
-        // Configure TipKit on app launch
-        MatoTips.configure()
-    }
-    
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    MatoTips.configure()
+                }
         }
 
         Settings {

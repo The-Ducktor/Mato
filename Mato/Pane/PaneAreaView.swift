@@ -329,6 +329,10 @@ struct NativeResizeHandle: View {
     
     @State private var isDragging = false
     @State private var isHovering = false
+    /// Tracks the translation from the previous onChange event so we can
+    /// compute an *incremental* delta instead of passing the cumulative
+    /// translation on every event (which caused the divider to fly away).
+    @State private var lastTranslation: CGFloat = 0
     
     var body: some View {
         ZStack {
@@ -368,17 +372,21 @@ struct NativeResizeHandle: View {
                 .onChanged { value in
                     if !isDragging {
                         isDragging = true
+                        lastTranslation = 0
                     }
                     
-                    // Calculate delta based on translation
-                    let delta = isVertical ? value.translation.width : value.translation.height
-                    let deltaRatio = delta / containerSize
+                    // Use the cumulative translation to derive the delta since
+                    // the last event, not since drag start.
+                    let cumulative = isVertical ? value.translation.width : value.translation.height
+                    let delta = cumulative - lastTranslation
+                    lastTranslation = cumulative
                     
-                    // Apply change
-                    onDrag(deltaRatio)
+                    guard containerSize > 0 else { return }
+                    onDrag(delta / containerSize)
                 }
                 .onEnded { _ in
                     isDragging = false
+                    lastTranslation = 0
                 }
         )
     }
