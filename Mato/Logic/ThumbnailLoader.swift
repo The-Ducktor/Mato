@@ -3,6 +3,51 @@ import Foundation
 import AppKit
 import Observation
 
+/// Actor to manage semaphore-based concurrency limits in Swift 6
+private actor ConcurrencyLimiter: Sendable {
+    private let maxConcurrent: Int
+    private var currentCount: Int = 0
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    
+    init(maxConcurrent: Int = 3) {
+        self.maxConcurrent = maxConcurrent
+    }
+    
+    func acquire() async {
+        while currentCount >= maxConcurrent {
+            await withCheckedContinuation { continuation in
+                waiters.append(continuation)
+            }
+        }
+        currentCount += 1
+    }
+    
+    func release() {
+        currentCount -= 1
+        if !waiters.isEmpty {
+            let waiter = waiters.removeFirst()
+            waiter.resume()
+        }
+    }
+}
+
+/// Actor to manage in-flight requests safely in Swift 6
+private actor RequestDeduplicator: Sendable {
+    private var inFlightRequests: [URL: Task<NSImage, Error>] = [:]
+    
+    func getExistingTask(for url: URL) -> Task<NSImage, Error>? {
+        return inFlightRequests[url]
+    }
+    
+    func setTask(_ task: Task<NSImage, Error>, for url: URL) {
+        inFlightRequests[url] = task
+    }
+    
+    func removeTask(for url: URL) {
+        inFlightRequests.removeValue(forKey: url)
+    }
+}
+
 @Observable
 final class SimpleThumbnailLoader: @unchecked Sendable {
     
@@ -40,6 +85,12 @@ final class SimpleThumbnailLoader: @unchecked Sendable {
     private let thumbnailGenerator = QLThumbnailGenerator.shared
     private let imageCache = NSCache<NSURL, NSImage>()
     
+    // In-flight requests to prevent duplicate work (Swift 6 safe)
+    private nonisolated let deduplicator = RequestDeduplicator()
+    
+    // Concurrent operations limit using actor instead of semaphore
+    private nonisolated let concurrencyLimiter = ConcurrencyLimiter(maxConcurrent: 3)
+    
     // MARK: - Initialization
     
     init() {
@@ -53,7 +104,7 @@ final class SimpleThumbnailLoader: @unchecked Sendable {
     
     // MARK: - Public Methods
     
-    /// Generate a thumbnail using QuickLook
+    /// Generate a thumbnail using QuickLook with deduplication and priority handling
     func generateThumbnail(for url: URL, options: ThumbnailOptions = ThumbnailOptions()) async throws -> NSImage {
         guard url.isFileURL else {
             throw ThumbnailError.invalidURL
@@ -64,9 +115,56 @@ final class SimpleThumbnailLoader: @unchecked Sendable {
             return cachedImage
         }
         
-        let thumbnail = try await generateQuickLookThumbnail(for: url, options: options)
-        imageCache.setObject(thumbnail, forKey: url as NSURL)
-        return thumbnail
+        // Check for in-flight request to avoid duplicate work
+        if let existingTask = await deduplicator.getExistingTask(for: url) {
+            return try await existingTask.value
+        }
+        
+        // Create a new request task
+        let requestTask = Task<NSImage, Error> {
+            defer {
+                Task.detached {
+                    await self.deduplicator.removeTask(for: url)
+                }
+            }
+            
+            // Limit concurrent operations using actor
+            await self.concurrencyLimiter.acquire()
+            defer {
+                Task.detached {
+                    await self.concurrencyLimiter.release()
+                }
+            }
+            
+            let thumbnail = try await self.generateQuickLookThumbnail(for: url, options: options)
+            self.imageCache.setObject(thumbnail, forKey: url as NSURL)
+            return thumbnail
+        }
+        
+        // Store the in-flight request
+        await deduplicator.setTask(requestTask, for: url)
+        
+        return try await requestTask.value
+    }
+    
+    /// Generate thumbnails in batch with priority handling
+    func generateThumbnailsBatch(for urls: [URL], options: ThumbnailOptions = ThumbnailOptions()) async throws -> [URL: NSImage] {
+        var results: [URL: NSImage] = [:]
+        
+        try await withThrowingTaskGroup(of: (URL, NSImage).self) { group in
+            for url in urls {
+                try group.addTask {
+                    let image = try await self.generateThumbnail(for: url, options: options)
+                    return (url, image)
+                }
+            }
+            
+            for try await (url, image) in group {
+                results[url] = image
+            }
+        }
+        
+        return results
     }
     
     // MARK: - Private Methods

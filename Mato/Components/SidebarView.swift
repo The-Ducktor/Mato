@@ -28,6 +28,7 @@ struct SidebarView: View {
 // MARK: - Quick Access Section
 struct QuickAccessSection: View {
     var paneManager: PaneManager
+    @State private var hoverPreloadTask: Task<Void, Never>?
     
     var body: some View {
         Section("Quick Access") {
@@ -37,6 +38,17 @@ struct QuickAccessSection: View {
                 Label("Downloads", systemImage: "arrow.down.circle")
             }
             .buttonStyle(.plain)
+            .onHover { hovering in
+                hoverPreloadTask?.cancel()
+                guard hovering,
+                      let downloadsURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
+                else { return }
+                hoverPreloadTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled else { return }
+                    paneManager.activePane?.preloadDirectory(at: downloadsURL)
+                }
+            }
             
             Button {
                 let homeURL = FileManager.default.homeDirectoryForCurrentUser
@@ -47,6 +59,16 @@ struct QuickAccessSection: View {
                 Label("Home", systemImage: "house")
             }
             .buttonStyle(.plain)
+            .onHover { hovering in
+                hoverPreloadTask?.cancel()
+                guard hovering else { return }
+                let homeURL = FileManager.default.homeDirectoryForCurrentUser
+                hoverPreloadTask = Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(250))
+                    guard !Task.isCancelled else { return }
+                    paneManager.activePane?.preloadDirectory(at: homeURL)
+                }
+            }
         }
     }
 }
@@ -222,6 +244,7 @@ struct PinnedFolderRow: View {
     @Binding var draggedFolderIndex: Int?
     @State private var isDropTarget = false
     @State private var showingIconPicker = false
+    @State private var hoverPreloadTask: Task<Void, Never>?
     
     var body: some View {
         VStack(spacing: 0) {
@@ -250,6 +273,16 @@ struct PinnedFolderRow: View {
                     }
                 }
                 .buttonStyle(.plain)
+                .onHover { hovering in
+                    hoverPreloadTask?.cancel()
+                    guard hovering else { return }
+                    let url = folder.url
+                    hoverPreloadTask = Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(250))
+                        guard !Task.isCancelled else { return }
+                        paneManager.activePane?.preloadDirectory(at: url)
+                    }
+                }
                 .contextMenu {
                     Button("Choose Icon...") {
                         showingIconPicker = true

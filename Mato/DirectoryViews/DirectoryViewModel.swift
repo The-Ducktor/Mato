@@ -69,6 +69,14 @@ class DirectoryViewModel {
     // Flag to prevent concurrent sorting operations
     @ObservationIgnored private var isUpdatingSortedItems = false
 
+    // MARK: - Preload Cache
+    // LRU-evicted cache of directory contents fetched on hover, before navigation.
+    // Capped at 10 entries so memory impact is negligible.
+    private static let preloadCacheLimit = 10
+    @ObservationIgnored private var preloadCache: [URL: [DirectoryItem]] = [:]
+    @ObservationIgnored private var preloadCacheOrder: [URL] = [] // tracks insertion order for LRU eviction
+    @ObservationIgnored private var preloadTasks: [URL: Task<Void, Never>] = [:]
+
     init() {
         // Use default folder from settings
         let defaultURL = SettingsModel.shared.defaultFolderURL
@@ -76,6 +84,67 @@ class DirectoryViewModel {
         currentDirectory = defaultURL  // Set immediately to prevent showing wrong directory
         pathString = defaultURL.path
         loadDirectory(at: defaultURL)
+    }
+
+    // MARK: - Hover Preloading
+
+    /// Preloads the contents of a directory into the cache.
+    /// Called on hover (after a debounce delay). Safe to call multiple times —
+    /// skips if already cached or a preload is already in flight for this URL.
+    func preloadDirectory(at url: URL) {
+        // Only preload actual directories
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else { return }
+
+        // Skip if already cached
+        if preloadCache[url] != nil { return }
+
+        // Skip if a preload task is already running for this URL
+        if preloadTasks[url] != nil { return }
+
+        let shouldHideHiddenFiles = hideHiddenFiles
+
+        let task = Task { @MainActor [weak self, fileManager] in
+            guard let self else { return }
+            do {
+                let contents = try await fileManager.getContents(of: url)
+                let filtered = shouldHideHiddenFiles ? contents.filter { !$0.isHidden } : contents
+
+                // Only store if we weren't cancelled and the cache entry still doesn't exist
+                // (avoids overwriting a real navigation that already cleared the entry)
+                if !Task.isCancelled {
+                    self.storeInPreloadCache(url: url, items: filtered)
+                }
+            } catch {
+                // Preload failures are silent — navigation will fall back to normal load
+            }
+            self.preloadTasks.removeValue(forKey: url)
+        }
+
+        preloadTasks[url] = task
+    }
+
+    /// Cancel a pending hover preload (e.g. if a preload task is no longer needed).
+    func cancelPreload(for url: URL) {
+        preloadTasks[url]?.cancel()
+        preloadTasks.removeValue(forKey: url)
+    }
+
+    private func storeInPreloadCache(url: URL, items: [DirectoryItem]) {
+        // Evict oldest entry if at the limit
+        if preloadCacheOrder.count >= Self.preloadCacheLimit, let oldest = preloadCacheOrder.first {
+            preloadCache.removeValue(forKey: oldest)
+            preloadCacheOrder.removeFirst()
+        }
+        preloadCache[url] = items
+        preloadCacheOrder.append(url)
+    }
+
+    private func consumePreloadCache(for url: URL) -> [DirectoryItem]? {
+        guard let items = preloadCache[url] else { return nil }
+        preloadCache.removeValue(forKey: url)
+        preloadCacheOrder.removeAll { $0 == url }
+        return items
     }
 
     func loadDownloadsDirectory() {
@@ -118,43 +187,64 @@ class DirectoryViewModel {
         // Update currentDirectory and pathString immediately to prevent showing wrong directory
         currentDirectory = url
         pathString = url.path
-        
-        // Set loading state immediately (synchronously) to prevent UI from showing old content
-        isLoading = true
-        errorMessage = nil
-        
-        // Clear items immediately to prevent showing old directory content
-        items = []
-        
-        // Capture the current state we need in the background task
+
+        // Cancel any in-flight preload for this URL — we're doing a real navigation now
+        preloadTasks[url]?.cancel()
+        preloadTasks.removeValue(forKey: url)
+
         let shouldHideHiddenFiles = hideHiddenFiles
-        let previousItems = items // Keep previous items in case of error
 
-        // Defer directory loading to avoid "publishing during view update" warnings
-        Task { @MainActor [weak self, fileManager] in
-            guard let self = self else { return }
-            
-            do {
-                // Get contents on background thread using captured fileManager
-                let contents = try await fileManager.getContents(of: url)
+        // Check if we have preloaded data for this URL
+        if let cachedItems = consumePreloadCache(for: url) {
+            // Show cached content instantly — no loading spinner
+            errorMessage = nil
+            items = cachedItems
 
-                // Filter hidden files if needed
-                let filteredContents = shouldHideHiddenFiles ?
-                contents.filter { !($0.isHidden) } : contents
+            // Silently refresh in the background to catch any FS changes since hover
+            Task { @MainActor [weak self, fileManager] in
+                guard let self else { return }
+                // Only refresh if we're still on this directory
+                guard self.currentDirectory == url else { return }
+                do {
+                    let freshContents = try await fileManager.getContents(of: url)
+                    let filtered = shouldHideHiddenFiles ? freshContents.filter { !$0.isHidden } : freshContents
+                    // Only apply if we're still viewing the same directory
+                    if self.currentDirectory == url {
+                        self.items = filtered
+                    }
+                } catch {
+                    // Silent refresh failure is fine — we already have cached data showing
+                }
+            }
+        } else {
+            // No cache — normal load with loading indicator
+            isLoading = true
+            errorMessage = nil
 
-                // Set items directly, no sorting.
-                self.items = filteredContents
-                self.isLoading = false
+            // Clear items immediately to prevent showing old directory content
+            items = []
 
-            } catch {
-                // Handle error on main actor - keep previous items and stay in current directory
-                self.errorMessage = "Error loading directory: \(error.localizedDescription)"
-                self.items = previousItems // Restore previous items
-                self.isLoading = false
-                
-                // Reset path string to current directory
-                if let currentDir = self.currentDirectory {
-                    self.pathString = currentDir.path
+            let previousItems = items // empty at this point, kept for error restore symmetry
+
+            Task { @MainActor [weak self, fileManager] in
+                guard let self = self else { return }
+
+                do {
+                    let contents = try await fileManager.getContents(of: url)
+                    let filteredContents = shouldHideHiddenFiles ?
+                        contents.filter { !($0.isHidden) } : contents
+
+                    self.items = filteredContents
+                    self.isLoading = false
+
+                } catch {
+                    self.errorMessage = "Error loading directory: \(error.localizedDescription)"
+                    self.items = previousItems
+                    self.isLoading = false
+
+                    if let currentDir = self.currentDirectory {
+                        self.pathString = currentDir.path
+                    }
                 }
             }
         }

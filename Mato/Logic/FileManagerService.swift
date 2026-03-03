@@ -9,9 +9,24 @@ import Foundation
 import UniformTypeIdentifiers
 import AppKit
 
+/// Actor to manage task cancellation safely in Swift 6
+private actor TaskCancellationManager: Sendable {
+    private var activeTasks: [URL: Task<Void, Never>] = [:]
+    
+    func cancelPendingOperations(for directory: URL) {
+        activeTasks[directory]?.cancel()
+        activeTasks.removeValue(forKey: directory)
+    }
+    
+    func trackTask(_ task: Task<Void, Never>, for directory: URL) {
+        activeTasks[directory] = task
+    }
+}
+
 final class FileManagerService: @unchecked Sendable {
     static let shared = FileManagerService()
     private let fileManager = FileManager.default
+    private nonisolated let taskManager = TaskCancellationManager()
     
     private init() {}
     
@@ -19,8 +34,19 @@ final class FileManagerService: @unchecked Sendable {
         return fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first
     }
     
+    // Cancel any pending operations for a specific directory
+    func cancelPendingOperations(for directory: URL) {
+        // Note: This is non-blocking as it's an actor call
+        Task.detached { [taskManager] in
+            await taskManager.cancelPendingOperations(for: directory)
+        }
+    }
+    
     func getContents(of directory: URL) async throws -> [DirectoryItem] {
-        return try await Task.detached(priority: .userInitiated) { [self, fileManager] in
+        // Cancel any previous request for this directory
+        await taskManager.cancelPendingOperations(for: directory)
+        
+        let task = Task.detached(priority: .userInitiated) { [self, fileManager] in
             let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [
                 .isDirectoryKey,
                 .fileSizeKey,
@@ -34,7 +60,9 @@ final class FileManagerService: @unchecked Sendable {
             ])
 
             var items: [DirectoryItem] = []
+            // Process items with lower priority to keep UI responsive
             for url in contents {
+                try Task.checkCancellation()
                 do {
                     let resourceValues = try url.resourceValues(forKeys: [
                         .isDirectoryKey,
@@ -54,7 +82,12 @@ final class FileManagerService: @unchecked Sendable {
                 }
             }
             return items
-        }.value
+        }
+        
+        // Track the task for cancellation
+        await taskManager.trackTask(Task { _ = try? await task.value }, for: directory)
+        
+        return try await task.value
     }
     
     @MainActor

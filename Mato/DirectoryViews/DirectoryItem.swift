@@ -86,4 +86,49 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
     static let byKindDescending = KeyPathComparator<DirectoryItem>(\DirectoryItem.fileTypeDescription, order: .reverse)
     static let byModifiedAscending = KeyPathComparator<DirectoryItem>(\DirectoryItem.lastModified, order: .forward)
     static let byModifiedDescending = KeyPathComparator<DirectoryItem>(\DirectoryItem.lastModified, order: .reverse)
+    
+    // MARK: - Cached Date Formatting
+    
+    // Shared formatters for performance
+    // These are thread-safe in practice and only read after initialization
+    nonisolated(unsafe) private static let relativeDateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+    
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter
+    }()
+    
+    // Cached formatted dates - computed on demand
+    var formattedLastModified: String {
+        formatDate(lastModified)
+    }
+    
+    var formattedCreationDate: String {
+        formatDate(creationDate)
+    }
+    
+    var formattedAddedDate: String {
+        formatDate(addedDate)
+    }
+    
+    var formattedLastAccessed: String {
+        formatDate(dateLastAccessed)
+    }
+    
+    private func formatDate(_ date: Date) -> String {
+        let now = Date()
+        let calendar = Calendar.current
+        
+        if calendar.isDateInToday(date) || calendar.isDateInYesterday(date) || calendar.isDateInTomorrow(date) {
+            return Self.relativeDateFormatter.localizedString(for: date, relativeTo: now)
+        } else {
+            return Self.dateFormatter.string(from: date)
+        }
+    }
 }

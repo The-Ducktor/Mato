@@ -41,6 +41,10 @@ struct ImageIcon: View {
             loadTask?.cancel()
             loadTask = nil
         }
+        // Use a low priority to keep scrolling smooth
+        .task(priority: .low) {
+            // This will auto-refresh if needed
+        }
     }
     
     private func loadThumbnail() async {

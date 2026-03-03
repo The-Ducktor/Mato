@@ -284,7 +284,7 @@ struct DirectoryGridView: View {
     private func handleHover(item: DirectoryItem, hovering: Bool) {
         // Cancel any pending hover task
         hoverDebounceTask?.cancel()
-        
+
         // Immediate update without animation
         withTransaction(Transaction(animation: nil)) {
             if hovering {
@@ -294,6 +294,15 @@ struct DirectoryGridView: View {
                 // Set immediately for hover-out
                 hoveredItemID = nil
             }
+        }
+
+        // Preload directory contents after a short dwell time so fast mouse
+        // movement doesn't trigger unnecessary fetches.
+        guard hovering, item.isDirectory, !item.isAppBundle else { return }
+        hoverDebounceTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            viewModel.preloadDirectory(at: item.url)
         }
     }
 

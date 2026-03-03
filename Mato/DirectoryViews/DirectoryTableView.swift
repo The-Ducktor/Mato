@@ -20,7 +20,6 @@ struct DirectoryTableView: View {
     @State private var color: Color = .clear // testing
     @State private var isDropTargeted: Bool = false
     @State private var hoveredFolderID: DirectoryItem.ID? = nil
-    @State private var tableRebuildID = UUID() // Force table rebuild on sort changes
     @State private var sortUpdateTask: Task<Void, Never>? = nil // Debounce sort updates
     @State private var localSortOrder: [KeyPathComparator<DirectoryItem>] = [] // Local copy to prevent binding conflicts
     @State private var isProcessingSortChange = false // Prevent re-entrant updates
@@ -64,12 +63,12 @@ struct DirectoryTableView: View {
                 .customizationID("kind")
 
                 TableColumn("Date Modified", value: \.lastModified) { item in
-                    Text(formatDate(item.lastModified))
+                    Text(item.formattedLastModified)
                 }
                 .customizationID("dateModified")
                 
                 TableColumn("Date Created", value: \.creationDate) { item in
-                    Text(formatDate(item.creationDate))
+                    Text(item.formattedCreationDate)
                 }
                 .width(min: 150)
                 .alignment(.trailing)
@@ -77,7 +76,7 @@ struct DirectoryTableView: View {
                 .defaultVisibility(.hidden)
                 
                 TableColumn("Date Added", value: \.addedDate) { item in
-                    Text(formatDate(item.addedDate))
+                    Text(item.formattedAddedDate)
                 }
                 .width(min: 150)
                 .alignment(.trailing)
@@ -88,7 +87,7 @@ struct DirectoryTableView: View {
                     "Last Accessed",
                     value: \.dateLastAccessed
                 ) { item in
-                    Text(formatDate(item.dateLastAccessed))
+                    Text(item.formattedLastAccessed)
                 }
                 .width(min: 150)
                 .alignment(.trailing)
@@ -100,8 +99,7 @@ struct DirectoryTableView: View {
                         .draggable(makeDraggedFiles(for: item))
                 }
             }
-            .id(tableRebuildID) // Force complete rebuild when this changes
-            .animation(.none, value: localSortOrder) // Disable animations on sort order changes to prevent crashes
+            .animation(.none, value: localSortOrder) // Disable animations on sort order changes
             .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
             .onAppear {
                 // Initialize local sort order from binding
@@ -118,23 +116,19 @@ struct DirectoryTableView: View {
                 // Immediately clear selection to prevent index issues
                 selectedItems.removeAll()
                 
-                // Update immediately - no delay needed since we're disabling animations
+                // Update sort order - SwiftUI will handle row updates efficiently
                 sortUpdateTask = Task { @MainActor in
                     guard !Task.isCancelled else {
                         isProcessingSortChange = false
                         return
                     }
                     
-                    // Disable animations and update sort order immediately to prevent table crashes
+                    // Update without forcing complete rebuild
                     var transaction = Transaction()
                     transaction.disablesAnimations = true
                     withTransaction(transaction) {
-                        // Update the view model
                         viewModel.setSortOrder(newValue)
-                        // Update the external binding
                         sortOrder = newValue
-                        // Force complete table rebuild by changing the ID
-                        tableRebuildID = UUID()
                     }
                     
                     isProcessingSortChange = false
@@ -146,13 +140,11 @@ struct DirectoryTableView: View {
                 localSortOrder = newValue
             }
             .onChange(of: viewModel.currentDirectory) { _, _ in
-                // Clear selection when changing directories to prevent stale references
+                // Clear selection when changing directories
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
                     selectedItems.removeAll()
-                    // Force table rebuild on directory change
-                    tableRebuildID = UUID()
                 }
             }
         }
@@ -217,41 +209,26 @@ struct DirectoryTableView: View {
     }
 
 
-    // Cache formatters to avoid recreating them for every cell
-    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter
-    }()
-    
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
-    private func formatDate(_ date: Date) -> String {
-        let now = Date()
-        let calendar = Calendar.current
-        
-        if calendar.isDateInToday(date) || calendar.isDateInYesterday(date) || calendar.isDateInTomorrow(date) {
-            return Self.relativeDateFormatter.localizedString(for: date, relativeTo: now)
-        } else {
-            return Self.dateFormatter.string(from: date)
-        }
-    }
+    // Date formatting is now handled by DirectoryItem for better performance
     
 }
 
-// Separate view component for Name cell to properly handle @State
-struct NameCellView: View {
+// Separate view component for Name cell with Equatable for performance
+@MainActor struct NameCellView: View, Equatable {
     let item: DirectoryItem
     var viewModel: DirectoryViewModel
     let selectedItems: Set<DirectoryItem.ID>
     @Binding var hoveredFolderID: DirectoryItem.ID?
     @Binding var color: Color
     @State private var isRowTargeted = false
+    @State private var hoverPreloadTask: Task<Void, Never>?
+    
+    // Implement Equatable to prevent unnecessary re-renders
+    // Note: @State properties are not included in equality check as they are view-local state
+    nonisolated static func == (lhs: NameCellView, rhs: NameCellView) -> Bool {
+        lhs.item.id == rhs.item.id &&
+        lhs.selectedItems == rhs.selectedItems
+    }
     
     var body: some View {
         HStack {
@@ -267,6 +244,15 @@ struct NameCellView: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(isRowTargeted && item.isDirectory ? Color.accentColor.opacity(0.25) : Color.clear)
         )
+        .onHover { hovering in
+            hoverPreloadTask?.cancel()
+            guard hovering, item.isDirectory, !item.isAppBundle else { return }
+            hoverPreloadTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                viewModel.preloadDirectory(at: item.url)
+            }
+        }
         .onDrop(of: [UTType.fileURL], isTargeted: $isRowTargeted) { providers in
             guard item.isDirectory else { return false }
 
