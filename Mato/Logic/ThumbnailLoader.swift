@@ -153,7 +153,7 @@ final class SimpleThumbnailLoader: @unchecked Sendable {
         
         try await withThrowingTaskGroup(of: (URL, NSImage).self) { group in
             for url in urls {
-                try group.addTask {
+                group.addTask {
                     let image = try await self.generateThumbnail(for: url, options: options)
                     return (url, image)
                 }

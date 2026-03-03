@@ -130,11 +130,13 @@ class AudioPlayerService {
     /// Start the progress timer
     private func startProgressTimer() {
         stopProgressTimer()
-        // The class is @MainActor-isolated, so the timer closure already runs on
-        // the main actor — no inner Task wrapper needed.
+        // scheduledTimer's block is @Sendable, so we must explicitly hop to
+        // @MainActor to access the main-actor-isolated properties.
         progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
-            guard let self, let player = self.audioPlayer else { return }
-            self.currentTime = player.currentTime
+            Task { @MainActor [weak self] in
+                guard let self, let player = self.audioPlayer else { return }
+                self.currentTime = player.currentTime
+            }
         }
     }
     

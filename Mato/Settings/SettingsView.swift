@@ -20,7 +20,7 @@ struct SettingsView: View {
                     HStack {
                         Image(systemName: "gearshape.fill")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundStyle(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                         
                         Text("Preferences")
                             .font(.system(size: 24, weight: .medium))
@@ -180,7 +180,7 @@ struct SettingsView: View {
                                         
                                         Text("\(Int(sliderValue))")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundStyle(.accentColor)
+                                            .foregroundStyle(Color.accentColor)
                                             .frame(width: 24, alignment: .center)
                                     }
                                     
@@ -242,7 +242,7 @@ struct SettingsCard<Content: View>: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 20, height: 20)
                 
                 VStack(alignment: .leading, spacing: 2) {

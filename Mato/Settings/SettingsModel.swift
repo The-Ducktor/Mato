@@ -9,22 +9,46 @@ import Observation
 @Observable
 class SettingsModel {
     static let shared = SettingsModel()
-    
-    // @AppStorage properties must NOT be marked @ObservationIgnored when used
-    // inside an @Observable class — removing that annotation lets the
-    // @Observable macro track changes and re-render dependent views.
-    @AppStorage("defaultSortMethod") var defaultSortMethod: String = "date"
-    @AppStorage("defaultFolder") var defaultFolder: String = FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
-    @AppStorage("defaultPaneCount") var defaultPaneCount: Int = 2
-    @AppStorage("viewMode") var viewMode: String = "list"
-    @AppStorage("useSavedViewMode") var useSavedViewMode: Bool = true
-    
+
+    // @AppStorage cannot be combined with @Observable — the macro synthesises
+    // a _propertyName backing store that collides with @AppStorage's own storage.
+    // Instead we use plain stored vars (tracked by @Observable) and mirror
+    // reads/writes to UserDefaults manually.
+
+    var defaultSortMethod: String {
+        didSet { UserDefaults.standard.set(defaultSortMethod, forKey: "defaultSortMethod") }
+    }
+    var defaultFolder: String {
+        didSet { UserDefaults.standard.set(defaultFolder, forKey: "defaultFolder") }
+    }
+    var defaultPaneCount: Int {
+        didSet { UserDefaults.standard.set(defaultPaneCount, forKey: "defaultPaneCount") }
+    }
+    var viewMode: String {
+        didSet { UserDefaults.standard.set(viewMode, forKey: "viewMode") }
+    }
+    var useSavedViewMode: Bool {
+        didSet { UserDefaults.standard.set(useSavedViewMode, forKey: "useSavedViewMode") }
+    }
+
+    private init() {
+        let ud = UserDefaults.standard
+        defaultSortMethod = ud.string(forKey: "defaultSortMethod") ?? "date"
+        defaultFolder     = ud.string(forKey: "defaultFolder")
+                            ?? FileManager.default.homeDirectoryForCurrentUser.path(percentEncoded: false)
+        defaultPaneCount  = ud.object(forKey: "defaultPaneCount") != nil
+                            ? ud.integer(forKey: "defaultPaneCount") : 2
+        viewMode          = ud.string(forKey: "viewMode") ?? "list"
+        useSavedViewMode  = ud.object(forKey: "useSavedViewMode") != nil
+                            ? ud.bool(forKey: "useSavedViewMode") : true
+    }
+
     let sortMethods: [String] = ["name", "date", "size", "type", "created"]
-    
+
     var defaultFolderURL: URL {
         URL(filePath: defaultFolder)
     }
-    
+
     static func keyPathComparator(for method: String) -> [KeyPathComparator<DirectoryItem>] {
         switch method {
         case "name":

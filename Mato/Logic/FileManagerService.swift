@@ -9,16 +9,21 @@ import Foundation
 import UniformTypeIdentifiers
 import AppKit
 
+private protocol AnyTask: Sendable {
+    func cancel()
+}
+extension Task: AnyTask {}
+
 /// Actor to manage task cancellation safely in Swift 6
 private actor TaskCancellationManager: Sendable {
-    private var activeTasks: [URL: Task<Void, Never>] = [:]
-    
+    private var activeTasks: [URL: any AnyTask] = [:]
+
     func cancelPendingOperations(for directory: URL) {
         activeTasks[directory]?.cancel()
         activeTasks.removeValue(forKey: directory)
     }
-    
-    func trackTask(_ task: Task<Void, Never>, for directory: URL) {
+
+    func trackTask(_ task: some AnyTask, for directory: URL) {
         activeTasks[directory] = task
     }
 }
