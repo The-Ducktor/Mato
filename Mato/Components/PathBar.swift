@@ -6,8 +6,10 @@
 //
 
 import SwiftUI
+import os
 
 struct PathBar: View {
+    private let log = Logger(subsystem: "com.mato.app", category: "pathbar")
     @State private var isEditing = false
     @State private var pathString: String
     var viewModel: DirectoryViewModel
@@ -265,7 +267,7 @@ struct PathBar: View {
         pasteboard.setString(path, forType: .string)
         
         // Optional: Show a brief confirmation (you could add a toast notification here)
-        print("Copied path to clipboard: \(path)")
+        log.debug("Copied path to clipboard: \(path, privacy: .public)")
     }
     
     private func showInFinder(_ path: String) {

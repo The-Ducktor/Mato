@@ -9,6 +9,7 @@ import Foundation
 import AVFoundation
 import UniformTypeIdentifiers
 import Observation
+import os
 
 @MainActor
 @Observable
@@ -22,6 +23,7 @@ class AudioPlayerService {
     
     @ObservationIgnored private var audioPlayer: AVAudioPlayer?
     @ObservationIgnored private var progressTimer: Timer?
+    private let log = Logger(subsystem: "com.mato.app", category: "audio")
     
     private init() {}
     
@@ -70,7 +72,7 @@ class AudioPlayerService {
         do {
             // Check if file exists
             guard FileManager.default.fileExists(atPath: url.path) else {
-                print("Audio file not found: \(url.path)")
+                log.warning("Audio file not found: \(url.path, privacy: .public)")
                 return
             }
             
@@ -95,7 +97,7 @@ class AudioPlayerService {
                 }
             }
         } catch {
-            print("Failed to play audio: \(error.localizedDescription)")
+            log.error("Failed to play audio: \(error.localizedDescription, privacy: .public)")
             stop()
         }
     }

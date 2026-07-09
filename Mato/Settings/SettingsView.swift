@@ -1,6 +1,8 @@
 import SwiftUI
+import os
 
 struct SettingsView: View {
+    private let log = Logger(subsystem: "com.mato.app", category: "settings")
     @Bindable private var settings = SettingsModel.shared
     @State private var folderPath: String
     @State private var showingFolderPicker = false
@@ -155,7 +157,7 @@ struct SettingsView: View {
                                     settings.defaultFolder = url.path
                                 }
                             case .failure(let error):
-                                print("Folder selection error: \(error.localizedDescription)")
+                                log.error("Folder selection error: \(error.localizedDescription, privacy: .public)")
                             }
                         }
                     }

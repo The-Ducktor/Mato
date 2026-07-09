@@ -1,6 +1,7 @@
 
 import SwiftUI
 import UniformTypeIdentifiers
+import os
 
 // MARK: - Shared NSItemProvider URL loading
 
@@ -57,6 +58,7 @@ extension NSItemProvider {
 
 struct DirectoryDropDelegate: DropDelegate {
     let viewModel: DirectoryViewModel
+    private let log = Logger(subsystem: "com.mato.app", category: "drop")
 
     func performDrop(info: DropInfo) -> Bool {
         let itemProviders = info.itemProviders(for: [.fileURL])
@@ -66,14 +68,14 @@ struct DirectoryDropDelegate: DropDelegate {
             var seenURLs = Set<String>()
             var sourceURLs: [URL] = []
             
-            print("🔍 DROP DEBUG: Got \(itemProviders.count) item providers")
+            log.debug("DROP DEBUG: Got \(itemProviders.count) item providers")
             
             for (index, itemProvider) in itemProviders.enumerated() {
                 let urls = try? await itemProvider.loadFileURLs()
                 if let urls = urls {
-                    print("  Provider [\(index)] returned \(urls.count) URLs:")
+                    log.debug("  Provider [\(index)] returned \(urls.count) URLs:")
                     for url in urls {
-                        print("    - \(url.lastPathComponent)")
+                        log.debug("    - \(url.lastPathComponent, privacy: .public)")
                         // Use the absolute path as the unique identifier
                         let path = url.path
                         if !seenURLs.contains(path) {
@@ -84,9 +86,9 @@ struct DirectoryDropDelegate: DropDelegate {
                 }
             }
             
-            print("🎯 Final unique URLs: \(sourceURLs.count)")
+            log.debug("Final unique URLs: \(sourceURLs.count)")
             for url in sourceURLs {
-                print("  - \(url.lastPathComponent)")
+                log.debug("  - \(url.lastPathComponent, privacy: .public)")
             }
             
             if !sourceURLs.isEmpty, let currentDirectory = viewModel.currentDirectory {
@@ -101,6 +103,7 @@ struct DirectoryDropDelegate: DropDelegate {
 struct ItemDropDelegate: DropDelegate {
     let item: DirectoryItem
     let viewModel: DirectoryViewModel
+    private let log = Logger(subsystem: "com.mato.app", category: "drop")
 
     func performDrop(info: DropInfo) -> Bool {
         guard item.isDirectory else {
@@ -114,14 +117,14 @@ struct ItemDropDelegate: DropDelegate {
             var seenURLs = Set<String>()
             var sourceURLs: [URL] = []
             
-            print("🔍 ITEM DROP DEBUG: Got \(itemProviders.count) item providers")
+            log.debug("ITEM DROP DEBUG: Got \(itemProviders.count) item providers")
             
             for (index, itemProvider) in itemProviders.enumerated() {
                 let urls = try? await itemProvider.loadFileURLs()
                 if let urls = urls {
-                    print("  Provider [\(index)] returned \(urls.count) URLs:")
+                    log.debug("  Provider [\(index)] returned \(urls.count) URLs:")
                     for url in urls {
-                        print("    - \(url.lastPathComponent)")
+                        log.debug("    - \(url.lastPathComponent, privacy: .public)")
                         // Use the absolute path as the unique identifier
                         let path = url.path
                         if !seenURLs.contains(path) {
@@ -132,9 +135,9 @@ struct ItemDropDelegate: DropDelegate {
                 }
             }
             
-            print("🎯 Final unique URLs: \(sourceURLs.count)")
+            log.debug("Final unique URLs: \(sourceURLs.count)")
             for url in sourceURLs {
-                print("  - \(url.lastPathComponent)")
+                log.debug("  - \(url.lastPathComponent, privacy: .public)")
             }
             
             if !sourceURLs.isEmpty {

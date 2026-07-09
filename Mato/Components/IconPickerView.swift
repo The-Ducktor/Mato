@@ -6,8 +6,10 @@
 //
 
 import SwiftUI
+import os
 
 struct IconPickerView: View {
+    private let log = Logger(subsystem: "com.mato.app", category: "icons")
     let selectedIcon: String
     let onSelect: (String) -> Void
     @Environment(\.dismiss) private var dismiss
@@ -47,7 +49,7 @@ struct IconPickerView: View {
     
     private func loadIcons() {
         guard let fileURL = Bundle.main.url(forResource: "sfsymbol6", withExtension: "txt") else {
-            print("Could not find sfsymbol6.txt")
+            log.error("Could not find sfsymbol6.txt")
             return
         }
         
@@ -90,7 +92,7 @@ struct IconPickerView: View {
             }.sorted { $0.0 < $1.0 }
             
         } catch {
-            print("Error reading icons file: \(error)")
+            log.error("Error reading icons file: \(error, privacy: .public)")
         }
     }
     
@@ -218,6 +220,6 @@ struct IconPickerView: View {
 
 #Preview {
     IconPickerView(selectedIcon: "folder") { icon in
-        print("Selected: \(icon)")
+        Logger(subsystem: "com.mato.app", category: "icons").debug("Selected: \(icon, privacy: .public)")
     }
 }

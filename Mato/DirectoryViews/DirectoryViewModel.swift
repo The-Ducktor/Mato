@@ -9,6 +9,7 @@ import Foundation
 import SwiftUI
 import UniformTypeIdentifiers
 import Observation
+import os
 
 @MainActor
 @Observable
@@ -60,6 +61,7 @@ class DirectoryViewModel {
     var conflictMessage = ""
     @ObservationIgnored private var pendingMoveOperation: (() -> Void)?
 
+    @ObservationIgnored private let log = Logger(subsystem: "com.mato", category: "directory")
     @ObservationIgnored private let fileManager = FileManagerService.shared
     @ObservationIgnored private let preferencesManager = DirectoryPreferencesManager.shared
 
@@ -225,10 +227,10 @@ class DirectoryViewModel {
             isLoading = true
             errorMessage = nil
 
+            let previousItems = items
+
             // Clear items immediately to prevent showing old directory content
             items = []
-
-            let previousItems = items // empty at this point, kept for error restore symmetry
 
             Task { @MainActor [weak self, fileManager] in
                 guard let self = self else { return }
@@ -384,6 +386,12 @@ class DirectoryViewModel {
         return !forwardStack.isEmpty
     }
 
+    func navigate(to url: URL) {
+        navigationStack = [url]
+        forwardStack = []
+        loadDirectory(at: url)
+    }
+
     func navigateToPath(_ path: String) {
         guard !path.isEmpty else { return }
 
@@ -478,7 +486,7 @@ class DirectoryViewModel {
                 try FileManager.default.moveItem(at: sourceURL, to: newURL)
             } catch {
                 await MainActor.run {
-                    print("Failed to rename: \(error)")
+                    log.error("Failed to rename: \(error.localizedDescription)")
                 }
             }
             // Directory watcher will pick up the change; explicit refresh is a
@@ -526,7 +534,7 @@ class DirectoryViewModel {
                     try FileManager.default.copyItem(at: url, to: destinationURL)
                 } catch {
                     await MainActor.run {
-                        print("Failed to paste: \(error)")
+                        log.error("Failed to paste: \(error.localizedDescription)")
                     }
                 }
             }
@@ -572,7 +580,7 @@ class DirectoryViewModel {
                 forType: NSPasteboard.PasteboardType("com.apple.alias-file")
             )
         } catch {
-            print("Failed to create alias: \(error)")
+            log.error("Failed to create alias: \(error.localizedDescription)")
         }
     }
 
@@ -626,7 +634,7 @@ class DirectoryViewModel {
                 task.waitUntilExit()
             } catch {
                 await MainActor.run {
-                    print("Failed to compress: \(error)")
+                    log.error("Failed to compress: \(error.localizedDescription)")
                 }
             }
             await MainActor.run { self.refreshCurrentDirectory() }
@@ -651,7 +659,7 @@ class DirectoryViewModel {
                 )
                 try aliasData.write(to: aliasURL)
             } catch {
-                print("Failed to create alias: \(error)")
+                log.error("Failed to create alias: \(error.localizedDescription)")
             }
         }
 
@@ -670,7 +678,7 @@ class DirectoryViewModel {
                     )
                 } catch {
                     await MainActor.run {
-                        print("Failed to move to trash: \(error)")
+                        self.errorMessage = "Failed to move to trash: \(error.localizedDescription)"
                     }
                 }
             }
@@ -679,7 +687,12 @@ class DirectoryViewModel {
     }
 
     func showServices(_ ids: Set<DirectoryItem.ID>) {
-        _ = getURLs(from: ids)
+        let urls = getURLs(from: ids)
+        guard !urls.isEmpty else { return }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.writeObjects(urls as [NSPasteboardWriting])
+        NSApplication.shared.orderFrontServicesMenu(nil)
     }
 
     // MARK: - Helper Methods
@@ -707,9 +720,9 @@ class DirectoryViewModel {
 
     func moveFiles(from sourceURLs: [URL], to destinationURL: URL, replaceExisting: Bool = false) {
         Task {
-            print("🔍 DEBUG: Moving \(sourceURLs.count) files to \(destinationURL.path)")
+            log.debug("Moving \(sourceURLs.count) files to \(destinationURL.path)")
             for (index, url) in sourceURLs.enumerated() {
-                print("  [\(index)] Source: \(url.lastPathComponent) from \(url.path)")
+                log.debug("  [\(index)] Source: \(url.lastPathComponent) from \(url.path)")
             }
             
             var successCount = 0
@@ -722,7 +735,7 @@ class DirectoryViewModel {
                 let destinationPath = destinationURL.appendingPathComponent(fileName)
                 
                 if FileManager.default.fileExists(atPath: destinationPath.path) && !replaceExisting {
-                    print("⚠️ Conflict detected: \(fileName) already exists at \(destinationPath.path)")
+                    log.debug("Conflict detected: \(fileName) already exists at \(destinationPath.path)")
                     conflictingFiles.append((sourceURL, destinationPath))
                 }
             }
@@ -750,22 +763,22 @@ class DirectoryViewModel {
                 let fileName = sourceURL.lastPathComponent
                 let destinationPath = destinationURL.appendingPathComponent(fileName)
                 
-                print("📦 Attempting to move: \(fileName)")
-                print("   From: \(sourceURL.path)")
-                print("   To: \(destinationPath.path)")
+                log.debug("Attempting to move: \(fileName)")
+                log.debug("   From: \(sourceURL.path)")
+                log.debug("   To: \(destinationPath.path)")
                 
                 do {
                     // If file exists and we're replacing, delete it first
                     if FileManager.default.fileExists(atPath: destinationPath.path) && replaceExisting {
-                        print("🗑️ Removing existing file at destination")
+                        log.debug("Removing existing file at destination")
                         try FileManager.default.removeItem(at: destinationPath)
                     }
                     
                     try await fileManager.moveFile(from: sourceURL, to: destinationURL)
-                    print("✅ Successfully moved: \(fileName)")
+                    log.debug("Successfully moved: \(fileName)")
                     successCount += 1
                 } catch {
-                    print("❌ Failed to move \(fileName): \(error.localizedDescription)")
+                    log.error("Failed to move \(fileName): \(error.localizedDescription)")
                     failedFiles.append((sourceURL.path, destinationPath.path, error.localizedDescription))
                 }
             }

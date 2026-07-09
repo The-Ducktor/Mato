@@ -52,9 +52,7 @@ struct QuickAccessSection: View {
             
             Button {
                 let homeURL = FileManager.default.homeDirectoryForCurrentUser
-                paneManager.activePane?.navigationStack = [homeURL]
-                paneManager.activePane?.forwardStack = []
-                paneManager.activePane?.loadDirectory(at: homeURL)
+                paneManager.activePane?.navigate(to: homeURL)
             } label: {
                 Label("Home", systemImage: "house")
             }
@@ -259,9 +257,7 @@ struct PinnedFolderRow: View {
             
             HStack(spacing: 6) {
                 Button {
-                    paneManager.activePane?.navigationStack = [folder.url]
-                    paneManager.activePane?.forwardStack = []
-                    paneManager.activePane?.loadDirectory(at: folder.url)
+                    paneManager.activePane?.navigate(to: folder.url)
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: folder.icon)

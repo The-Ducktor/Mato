@@ -7,6 +7,7 @@
 
 import Foundation
 import Observation
+import os
 
 struct PinnedFolder: Identifiable, Codable, Hashable {
     let id: UUID
@@ -27,6 +28,7 @@ struct PinnedFolder: Identifiable, Codable, Hashable {
 class PinnedFolderStore {
     var pinnedFolders: [PinnedFolder] = []
     @ObservationIgnored private let storeKey = "pinnedFolders"
+    private let log = Logger(subsystem: "com.mato.app", category: "pinned")
     
     static let shared = PinnedFolderStore()
     
@@ -78,7 +80,7 @@ class PinnedFolderStore {
             let decoder = JSONDecoder()
             pinnedFolders = try decoder.decode([PinnedFolder].self, from: data)
         } catch {
-            print("Failed to load pinned folders: \(error.localizedDescription)")
+            log.error("Failed to load pinned folders: \(error.localizedDescription, privacy: .public)")
         }
     }
     
@@ -88,7 +90,7 @@ class PinnedFolderStore {
             let data = try encoder.encode(pinnedFolders)
             UserDefaults.standard.set(data, forKey: storeKey)
         } catch {
-            print("Failed to save pinned folders: \(error.localizedDescription)")
+            log.error("Failed to save pinned folders: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

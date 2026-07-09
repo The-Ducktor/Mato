@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import os
 
 struct ContentView: View {
   
@@ -131,6 +132,7 @@ struct AddPinnedFolderView: View {
     @State private var showingFolderPicker = false
     @Environment(\.dismiss) private var dismiss
     var pinnedFolderStore = PinnedFolderStore.shared
+    private let log = Logger(subsystem: "com.mato.app", category: "app")
 
     var body: some View {
         VStack {
@@ -174,7 +176,7 @@ struct AddPinnedFolderView: View {
                         }
                     }
                 case .failure(let error):
-                    print("Folder selection error: \(error.localizedDescription)")
+                    log.error("Folder selection error: \(error.localizedDescription, privacy: .public)")
                 }
             }
 
