@@ -8,13 +8,24 @@ import os
 extension NSItemProvider {
     /// Loads all file URLs from a drag-and-drop item provider.
     /// Handles the three encodings produced by SwiftUI drag sources:
-    ///   1. A bare `URL` value
+    ///   1. A bare `URL` value (via `loadObject`)
     ///   2. An `NSKeyedArchiver`-encoded array of `NSURL`s (multi-select)
     ///   3. An `NSKeyedArchiver`-encoded single `NSURL`
     ///   4. A `URL.dataRepresentation` byte blob (fallback)
     @MainActor
     func loadFileURLs() async throws -> [URL] {
-        try await withCheckedThrowingContinuation { continuation in
+        // Try the modern sandbox-safe API first — returns security-scoped URLs
+        if let url = try? await withCheckedThrowingContinuation({ (continuation: CheckedContinuation<URL?, Error>) in
+            loadObject(ofClass: NSURL.self) { object, error in
+                if let error { continuation.resume(throwing: error); return }
+                continuation.resume(returning: object as? URL)
+            }
+        }) {
+            return [url]
+        }
+
+        // Fall back to the classic loadItem API for multi-select payloads
+        return try await withCheckedThrowingContinuation { continuation in
             loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
                 if let error = error {
                     continuation.resume(throwing: error)
@@ -30,17 +41,13 @@ extension NSItemProvider {
                     // Multi-select case: array of NSURLs archived by SwiftUI
                     if let urls = try? NSKeyedUnarchiver.unarchivedObject(
                         ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
-                        continuation.resume(returning: urls)
+                        let absolute = urls.filter { $0.isFileURL }
+                        continuation.resume(returning: absolute.isEmpty ? urls : absolute)
                         return
                     }
                     // Single URL archived by NSKeyedArchiver
                     if let url = try? NSKeyedUnarchiver.unarchivedObject(
                         ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                    // Fallback: raw URL data representation
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
                         continuation.resume(returning: [url])
                         return
                     }

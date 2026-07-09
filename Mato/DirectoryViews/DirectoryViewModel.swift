@@ -686,15 +686,6 @@ class DirectoryViewModel {
         }
     }
 
-    func showServices(_ ids: Set<DirectoryItem.ID>) {
-        let urls = getURLs(from: ids)
-        guard !urls.isEmpty else { return }
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.writeObjects(urls as [NSPasteboardWriting])
-        NSApp.servicesMenu?.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
-    }
-
     // MARK: - Helper Methods
 
     func getItem(_ id: DirectoryItem.ID) -> DirectoryItem? {
@@ -827,10 +818,8 @@ class DirectoryViewModel {
             var urls: [URL] = []
             
             for itemProvider in itemProviders {
-                if let data = try? await itemProvider.loadItem(forTypeIdentifier: UTType.fileURL.identifier),
-                   let urlData = data as? Data,
-                   let url = URL(dataRepresentation: urlData, relativeTo: nil) {
-                    urls.append(url)
+                if let loaded = try? await itemProvider.loadFileURLs() {
+                    urls.append(contentsOf: loaded)
                 }
             }
             

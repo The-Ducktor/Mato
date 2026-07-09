@@ -88,7 +88,9 @@ final class FileManagerService: @unchecked Sendable {
                     let item = self.makeDirectoryItem(from: url, with: resourceValues)
                     items.append(item)
                 } catch {
-                    log.error("Error getting attributes for \(url, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    if (error as NSError).code != NSFileNoSuchFileError {
+                        log.error("Error getting attributes for \(url, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    }
                 }
             }
             return items

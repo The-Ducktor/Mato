@@ -44,11 +44,6 @@ struct ImageIcon: View {
         guard !item.isDirectory && !item.isTextBasedFile else { return }
 
         isLoading = true
-        defer {
-            // Re-enter main actor to clear the loading flag.
-            // (This defer runs in the .task context, which is @MainActor.)
-            isLoading = false
-        }
 
         let options = SimpleThumbnailLoader.ThumbnailOptions(
             size: CGSize(width: 128, height: 128),
@@ -62,10 +57,17 @@ struct ImageIcon: View {
             // blocks scrolling or any other UI work.
             let loaded = try await Self.sharedLoader.generateThumbnail(for: item.url, options: options)
 
-            // Back on the main actor after the await returns.
-            thumbnail = loaded
+            // Use MainThreadGate to deliver the thumbnail only when the main
+            // thread is free (not busy with scroll tracking). During rapid
+            // scrolling, updates are batched and applied once tracking ends,
+            // preventing view-update storms that cause stuttering.
+            MainThreadGate.shared.schedule {
+                self.thumbnail = loaded
+                self.isLoading = false
+            }
         } catch {
-            // Cancellation or QuickLook failure — keep the workspace icon placeholder.
+            // Cancellation or QuickLook failure — clear loading state.
+            isLoading = false
         }
     }
 }

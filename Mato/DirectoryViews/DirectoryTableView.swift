@@ -167,51 +167,11 @@ struct DirectoryTableView: View {
         return DraggedFiles(urls: urlsToDrag)
     }
 
-    private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                // Handle different data types
-                if let url = data as? URL {
-                    // Direct URL object
-                    continuation.resume(returning: url)
-                    return
-                }
-                
-                if let data = data as? Data {
-                    // Try to unarchive the URL from NSKeyedArchiver format
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: url)
-                        return
-                    }
-                    
-                    // Try to unarchive an array of URLs
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL],
-                       let firstURL = urls.first {
-                        continuation.resume(returning: firstURL)
-                        return
-                    }
-                    
-                    // Fallback: try URL(dataRepresentation:)
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: url)
-                        return
-                    }
-                }
-                
-                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
-            }
-        }
-    }
-
-
     // Date formatting is now handled by DirectoryItem for better performance
     
 }
+
+// MARK: - Name Cell with hovers and drop target
 
 // Separate view component for Name cell with Equatable for performance
 @MainActor struct NameCellView: View, Equatable {
