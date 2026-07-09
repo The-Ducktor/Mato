@@ -7,11 +7,10 @@ import os
 
 extension NSItemProvider {
     /// Loads all file URLs from a drag-and-drop item provider.
-    /// Handles the three encodings produced by SwiftUI drag sources:
+    /// Handles the encodings produced by SwiftUI drag sources:
     ///   1. A bare `URL` value (via `loadObject`)
     ///   2. An `NSKeyedArchiver`-encoded array of `NSURL`s (multi-select)
     ///   3. An `NSKeyedArchiver`-encoded single `NSURL`
-    ///   4. A `URL.dataRepresentation` byte blob (fallback)
     @MainActor
     func loadFileURLs() async throws -> [URL] {
         // Try the modern sandbox-safe API first — returns security-scoped URLs
@@ -20,7 +19,7 @@ extension NSItemProvider {
                 if let error { continuation.resume(throwing: error); return }
                 continuation.resume(returning: object as? URL)
             }
-        }) {
+        }), Self.isValidFileURL(url) {
             return [url]
         }
 
@@ -32,7 +31,7 @@ extension NSItemProvider {
                     return
                 }
 
-                if let url = data as? URL {
+                if let url = data as? URL, Self.isValidFileURL(url) {
                     continuation.resume(returning: [url])
                     return
                 }
@@ -41,13 +40,16 @@ extension NSItemProvider {
                     // Multi-select case: array of NSURLs archived by SwiftUI
                     if let urls = try? NSKeyedUnarchiver.unarchivedObject(
                         ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
-                        let absolute = urls.filter { $0.isFileURL }
-                        continuation.resume(returning: absolute.isEmpty ? urls : absolute)
-                        return
+                        let valid = urls.filter { Self.isValidFileURL($0) }
+                        if !valid.isEmpty {
+                            continuation.resume(returning: valid)
+                            return
+                        }
                     }
                     // Single URL archived by NSKeyedArchiver
                     if let url = try? NSKeyedUnarchiver.unarchivedObject(
-                        ofClass: NSURL.self, from: data) as? URL {
+                        ofClass: NSURL.self, from: data) as? URL,
+                       Self.isValidFileURL(url) {
                         continuation.resume(returning: [url])
                         return
                     }
@@ -59,6 +61,11 @@ extension NSItemProvider {
                 ))
             }
         }
+    }
+
+    // ponytail: rejects garbage URLs that cause NUL-embedded paths
+    private static func isValidFileURL(_ url: URL) -> Bool {
+        url.isFileURL && !url.path.isEmpty && !url.path.contains("\0")
     }
 }
 
