@@ -256,7 +256,7 @@ struct DirectoryTableView: View {
         .onDrop(of: [UTType.fileURL], isTargeted: $isRowTargeted) { providers in
             guard item.isDirectory else { return false }
 
-            Task {
+            Task { @MainActor in
                 var files: [URL] = []
 
                 for provider in providers {
@@ -314,45 +314,6 @@ struct TableDropDelegate: DropDelegate {
             }
         }
         return true
-    }
-    
-    private func loadFileURLs(from provider: NSItemProvider) async throws -> [URL] {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                // Handle different data types
-                if let url = data as? URL {
-                    continuation.resume(returning: [url])
-                    return
-                }
-                
-                if let data = data as? Data {
-                    // Try to unarchive an ARRAY of URLs first (multi-select case)
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
-                        continuation.resume(returning: urls)
-                        return
-                    }
-                    
-                    // Try to unarchive a single URL
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                    
-                    // Fallback: try URL(dataRepresentation:)
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                }
-                
-                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
-            }
-        }
     }
     
     func dropEntered(info: DropInfo) {

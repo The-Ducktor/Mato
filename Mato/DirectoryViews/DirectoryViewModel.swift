@@ -486,7 +486,7 @@ class DirectoryViewModel {
                 try FileManager.default.moveItem(at: sourceURL, to: newURL)
             } catch {
                 await MainActor.run {
-                    log.error("Failed to rename: \(error.localizedDescription)")
+                    self.log.error("Failed to rename: \(error.localizedDescription)")
                 }
             }
             // Directory watcher will pick up the change; explicit refresh is a
@@ -534,7 +534,7 @@ class DirectoryViewModel {
                     try FileManager.default.copyItem(at: url, to: destinationURL)
                 } catch {
                     await MainActor.run {
-                        log.error("Failed to paste: \(error.localizedDescription)")
+                        self.log.error("Failed to paste: \(error.localizedDescription)")
                     }
                 }
             }
@@ -634,7 +634,7 @@ class DirectoryViewModel {
                 task.waitUntilExit()
             } catch {
                 await MainActor.run {
-                    log.error("Failed to compress: \(error.localizedDescription)")
+                    self.log.error("Failed to compress: \(error.localizedDescription)")
                 }
             }
             await MainActor.run { self.refreshCurrentDirectory() }
@@ -692,7 +692,7 @@ class DirectoryViewModel {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.writeObjects(urls as [NSPasteboardWriting])
-        NSApplication.shared.orderFrontServicesMenu(nil)
+        NSApp.servicesMenu?.popUp(positioning: nil, at: NSEvent.mouseLocation, in: nil)
     }
 
     // MARK: - Helper Methods

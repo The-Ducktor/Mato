@@ -12,6 +12,7 @@ extension NSItemProvider {
     ///   2. An `NSKeyedArchiver`-encoded array of `NSURL`s (multi-select)
     ///   3. An `NSKeyedArchiver`-encoded single `NSURL`
     ///   4. A `URL.dataRepresentation` byte blob (fallback)
+    @MainActor
     func loadFileURLs() async throws -> [URL] {
         try await withCheckedThrowingContinuation { continuation in
             loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
