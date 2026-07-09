@@ -14,11 +14,11 @@ struct DirectoryGridView: View {
     @Binding var sortOrder: [KeyPathComparator<DirectoryItem>]
     var quickLookAction: ((URL) -> Void)?
 
-    @State private var audioPlayer = AudioPlayerService.shared
     @State private var hoveredItemID: DirectoryItem.ID?
     @State private var isDropTargeted: Bool = false
     @FocusState private var isFocused: Bool
     @State private var containerWidth: CGFloat = 800
+    @State private var cachedItemsPerRow: Int = 6
     @State private var hoverDebounceTask: Task<Void, Never>?
 
     // Marquee selection state
@@ -31,29 +31,21 @@ struct DirectoryGridView: View {
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 120), spacing: 16)
     ]
-    
-    // Calculate number of columns based on actual container width
-    private var itemsPerRow: Int {
+
+    /// Recompute cached column count when container width changes.
+    private func updateItemsPerRow() {
         let itemMinWidth: CGFloat = 100
         let itemMaxWidth: CGFloat = 120
         let spacing: CGFloat = 16
-        let padding: CGFloat = 32 // 16 padding on each side
-        
+        let padding: CGFloat = 32
         let availableWidth = containerWidth - padding
-        
-        // Calculate how many items fit at minimum width
         let maxColumns = Int(availableWidth / (itemMinWidth + spacing))
-        
-        // Calculate actual item width with spacing
         let actualItemWidth = (availableWidth - CGFloat(maxColumns - 1) * spacing) / CGFloat(maxColumns)
-        
-        // If actual width exceeds max, reduce column count
         if actualItemWidth > itemMaxWidth {
-            let adjustedColumns = Int(availableWidth / (itemMaxWidth + spacing))
-            return max(1, adjustedColumns)
+            cachedItemsPerRow = max(1, Int(availableWidth / (itemMaxWidth + spacing)))
+        } else {
+            cachedItemsPerRow = max(1, maxColumns)
         }
-        
-        return max(1, maxColumns)
     }
 
     var body: some View {
@@ -138,6 +130,7 @@ struct DirectoryGridView: View {
             )
             .onAppear {
                 containerWidth = geometry.size.width
+                updateItemsPerRow()
             }
             .onChange(of: geometry.size.width) { _, newWidth in
                 // Use a transaction to ensure smooth updates
@@ -145,6 +138,7 @@ struct DirectoryGridView: View {
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
                     containerWidth = newWidth
+                    updateItemsPerRow()
                 }
             }
         }
@@ -234,9 +228,9 @@ struct DirectoryGridView: View {
         case .right:
             newIndex = min(items.count - 1, currentIndex + 1)
         case .up:
-            newIndex = max(0, currentIndex - itemsPerRow)
+            newIndex = max(0, currentIndex - cachedItemsPerRow)
         case .down:
-            newIndex = min(items.count - 1, currentIndex + itemsPerRow)
+            newIndex = min(items.count - 1, currentIndex + cachedItemsPerRow)
         }
         
         // Only update if the index changed

@@ -164,10 +164,14 @@ struct DirectoryView: View {
 
     // MARK: - Drag and Drop
 
+    /// O(1) lookup table built once per drag/selection access.
+    private var itemMap: [DirectoryItem.ID: DirectoryItem] {
+        viewModel.sortedItems.reduce(into: [:]) { $0[$1.id] = $1 }
+    }
+
     private func dragProvider() -> NSItemProvider {
-        let selectedURLs = selectedItems.compactMap { id in
-            viewModel.sortedItems.first { $0.id == id }?.url
-        }
+        let map = itemMap
+        let selectedURLs = selectedItems.compactMap { map[$0]?.url }
 
         guard !selectedURLs.isEmpty else { return NSItemProvider() }
 
@@ -196,9 +200,8 @@ struct DirectoryView: View {
     // Sorting is now handled by DirectoryViewModel
 
     private var selectedItemURLs: [URL] {
-        selectedItems.compactMap { id in
-            viewModel.sortedItems.first { $0.id == id }?.url
-        }
+        let map = itemMap
+        return selectedItems.compactMap { map[$0]?.url }
     }
 
     // MARK: - Key Press Actions

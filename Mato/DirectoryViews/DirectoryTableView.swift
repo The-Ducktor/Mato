@@ -184,7 +184,8 @@ struct DirectoryTableView: View {
     @State private var hoverPreloadTask: Task<Void, Never>?
     
     // Implement Equatable to prevent unnecessary re-renders
-    // Note: @State properties are not included in equality check as they are view-local state
+    // Note: @Binding properties are main-actor-isolated and can't be
+    // compared from a nonisolated context, so we skip hover state here.
     nonisolated static func == (lhs: NameCellView, rhs: NameCellView) -> Bool {
         lhs.item.id == rhs.item.id &&
         lhs.selectedItems == rhs.selectedItems

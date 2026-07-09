@@ -12,22 +12,30 @@ import SwiftUI
 
 public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
     
-    public let id: UUID
+    /// Stable identity derived from the file's URL path so that
+    /// re-loading the same files reuses existing SwiftUI views.
+    public var id: String { url.path }
 
-    var isDirectory: Bool
-    var isAppBundle: Bool
-    var url: URL
-    var name: String = "Unknown"
-    var size: Int = 0
-    var fileType: UTType = .text
-    var lastModified: Date = Date()
-    var creationDate: Date = Date()
-    var addedDate: Date = Date()
-    var dateLastAccessed: Date = Date()
-    var isHidden: Bool = false
+    let isDirectory: Bool
+    let isAppBundle: Bool
+    let url: URL
+    let name: String
+    let size: Int
+    let fileType: UTType
+    let lastModified: Date
+    let creationDate: Date
+    let addedDate: Date
+    let dateLastAccessed: Date
+    let isHidden: Bool
+    
+    /// Pre-formatted date strings — computed once at init instead of
+    /// re-formatting on every cell render.
+    let formattedLastModified: String
+    let formattedCreationDate: String
+    let formattedAddedDate: String
+    let formattedLastAccessed: String
     
     public init(
-        id: UUID = UUID(),
         isDirectory: Bool,
         isAppBundle: Bool,
         url: URL,
@@ -40,7 +48,6 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
         dateLastAccessed: Date = Date(),
         isHidden: Bool
     ) {
-        self.id = id
         self.isDirectory = isDirectory
         self.isAppBundle = isAppBundle
         self.url = url
@@ -53,6 +60,11 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
         self.addedDate = dateAdded
         self.dateLastAccessed = dateLastAccessed
         
+        // Cache formatted dates once
+        self.formattedLastModified = Self.formatDate(lastModified)
+        self.formattedCreationDate = Self.formatDate(creationDate)
+        self.formattedAddedDate = Self.formatDate(dateAdded)
+        self.formattedLastAccessed = Self.formatDate(dateLastAccessed)
     }
     
     var sortKeyName: String { name.localizedCaseInsensitiveCompare("") == .orderedSame ? url.lastPathComponent : name }
@@ -106,24 +118,9 @@ public struct DirectoryItem: Identifiable, Hashable, Sendable, Transferable {
         return formatter
     }()
     
-    // Cached formatted dates - computed on demand
-    var formattedLastModified: String {
-        formatDate(lastModified)
-    }
-    
-    var formattedCreationDate: String {
-        formatDate(creationDate)
-    }
-    
-    var formattedAddedDate: String {
-        formatDate(addedDate)
-    }
-    
-    var formattedLastAccessed: String {
-        formatDate(dateLastAccessed)
-    }
-    
-    private func formatDate(_ date: Date) -> String {
+    /// Formats a date using relative formatting for today/yesterday/tomorrow,
+    /// falling back to a standard date+time format for older dates.
+    private static func formatDate(_ date: Date) -> String {
         let now = Date()
         let calendar = Calendar.current
         

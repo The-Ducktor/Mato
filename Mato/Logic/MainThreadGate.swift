@@ -42,7 +42,9 @@ final class MainThreadGate: @unchecked Sendable {
 
     /// If scrolling lasts longer than this, the gate force‑flushes even
     /// during tracking so thumbnails don't stay blank indefinitely.
-    private static let maxDeferInterval: TimeInterval = 0.5
+    /// Increased from 0.5 to 1.5 to avoid mid-scroll stutter — thumbnails
+    /// appearing a beat after scrolling stops is better than dropped frames.
+    private static let maxDeferInterval: TimeInterval = 1.5
 
     // MARK: - State
 
