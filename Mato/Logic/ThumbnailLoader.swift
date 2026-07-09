@@ -104,7 +104,10 @@ final class SimpleThumbnailLoader: @unchecked Sendable {
     
     // MARK: - Public Methods
     
-    /// Generate a thumbnail using QuickLook with deduplication and priority handling
+    /// Generate a thumbnail using QuickLook with deduplication and priority handling.
+    /// Marked @concurrent so callers on the main actor immediately hop to the
+    /// cooperative thread pool — QuickLook decode never blocks the main actor.
+    @concurrent
     func generateThumbnail(for url: URL, options: ThumbnailOptions = ThumbnailOptions()) async throws -> NSImage {
         guard url.isFileURL else {
             throw ThumbnailError.invalidURL
@@ -147,7 +150,9 @@ final class SimpleThumbnailLoader: @unchecked Sendable {
         return try await requestTask.value
     }
     
-    /// Generate thumbnails in batch with priority handling
+    /// Generate thumbnails in batch with priority handling.
+    /// @concurrent keeps the entire batch off the main actor.
+    @concurrent
     func generateThumbnailsBatch(for urls: [URL], options: ThumbnailOptions = ThumbnailOptions()) async throws -> [URL: NSImage] {
         var results: [URL: NSImage] = [:]
         
@@ -169,6 +174,10 @@ final class SimpleThumbnailLoader: @unchecked Sendable {
     
     // MARK: - Private Methods
     
+    /// Performs the actual QuickLook request.
+    /// @concurrent ensures this always runs on the cooperative thread pool,
+    /// never on the main actor, even when called from a @MainActor context.
+    @concurrent
     private func generateQuickLookThumbnail(for url: URL, options: ThumbnailOptions) async throws -> NSImage {
         return try await withCheckedThrowingContinuation { continuation in
             // Use .thumbnail with .icon fallback for optimal performance
