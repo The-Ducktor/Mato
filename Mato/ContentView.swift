@@ -13,6 +13,7 @@ struct ContentView: View {
     @State private var pinnedFolderStore = PinnedFolderStore.shared
     @State private var showingAddPinnedFolderSheet = false
     @State private var paneManager = PaneManager()
+    @State private var volumeService = VolumeService()
     @State private var settings = SettingsModel.shared
 
 
@@ -21,6 +22,7 @@ struct ContentView: View {
             SidebarView(
                 paneManager: paneManager,
                 pinnedFolderStore: pinnedFolderStore,
+                volumeService: volumeService,
                 showingAddPinnedFolderSheet: $showingAddPinnedFolderSheet
             )
             .sheet(isPresented: $showingAddPinnedFolderSheet) {

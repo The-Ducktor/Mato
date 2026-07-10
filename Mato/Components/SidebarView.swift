@@ -10,11 +10,13 @@ import SwiftUI
 struct SidebarView: View {
     var paneManager: PaneManager
     var pinnedFolderStore: PinnedFolderStore
+    var volumeService: VolumeService
     @Binding var showingAddPinnedFolderSheet: Bool
     
     var body: some View {
         List {
             QuickAccessSection(paneManager: paneManager)
+            VolumesSection(volumeService: volumeService, paneManager: paneManager)
             PinnedFoldersSection(
                 paneManager: paneManager,
                 pinnedFolderStore: pinnedFolderStore
@@ -68,6 +70,68 @@ struct QuickAccessSection: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Volumes Section
+struct VolumesSection: View {
+    var volumeService: VolumeService
+    var paneManager: PaneManager
+    @State private var hoverPreloadTask: Task<Void, Never>?
+    @State private var ejectingVolume: Volume?
+    @State private var ejectError: String?
+
+    var body: some View {
+        Section("Devices") {
+            ForEach(volumeService.volumes) { volume in
+                HStack(spacing: 6) {
+                    Button {
+                        paneManager.activePane?.navigate(to: volume.url)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(nsImage: volume.icon)
+                                .resizable()
+                                .frame(width: 16, height: 16)
+                            Text(volume.name)
+                                .lineLimit(1)
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        hoverPreloadTask?.cancel()
+                        guard hovering else { return }
+                        let url = volume.url
+                        hoverPreloadTask = Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(250))
+                            guard !Task.isCancelled else { return }
+                            paneManager.activePane?.preloadDirectory(at: url)
+                        }
+                    }
+
+                    if volume.isEjectable {
+                        Button {
+                            ejectVolume(volume)
+                        } label: {
+                            Image(systemName: "eject.fill")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .help("Eject “\(volume.name)”")
+                        .disabled(ejectingVolume == volume)
+                    }
+                }
+                .padding(.vertical, 2)
+                .padding(.horizontal, 4)
+            }
+        }
+    }
+
+    private func ejectVolume(_ volume: Volume) {
+        ejectingVolume = volume
+        volumeService.eject(volume)
+        ejectingVolume = nil
     }
 }
 
@@ -354,6 +418,7 @@ struct PinnedFolderRow: View {
         SidebarView(
             paneManager: PaneManager(),
             pinnedFolderStore: PinnedFolderStore.shared,
+            volumeService: VolumeService(),
             showingAddPinnedFolderSheet: .constant(false)
         )
     } detail: {
