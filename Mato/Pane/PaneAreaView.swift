@@ -7,7 +7,7 @@
 import SwiftUI
 
 struct PaneAreaView: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
 
     // Persist split positions using @AppStorage
     @AppStorage("dualSplit") private var dualSplit: Double = 0.5
@@ -85,7 +85,7 @@ struct PaneAreaView: View {
 // MARK: - Draggable Pane Wrapper
 struct DraggablePane: View {
     let paneIndex: Int
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     @Binding var draggedPaneIndex: Int?
     @State private var isDropTarget = false
     @State private var isDragging = false
@@ -152,7 +152,7 @@ struct DraggablePane: View {
 
 // MARK: - Resizable Dual Pane View
 struct ResizableDualPaneView: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     @Binding var splitPosition: Double
     @State private var draggedPaneIndex: Int?
     
@@ -191,7 +191,7 @@ struct ResizableDualPaneView: View {
 
 // MARK: - Resizable Triple Pane View
 struct ResizableTriplePaneView: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     @Binding var firstSplit: Double
     @Binding var secondSplit: Double
     @State private var draggedPaneIndex: Int?
@@ -242,7 +242,7 @@ struct ResizableTriplePaneView: View {
 
 // MARK: - Resizable Quad Pane View
 struct ResizableQuadPaneView: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     @Binding var verticalSplit: Double
     @Binding var topLeftWidth: Double
     @Binding var bottomLeftWidth: Double
@@ -329,6 +329,10 @@ struct NativeResizeHandle: View {
     
     @State private var isDragging = false
     @State private var isHovering = false
+    /// Tracks the translation from the previous onChange event so we can
+    /// compute an *incremental* delta instead of passing the cumulative
+    /// translation on every event (which caused the divider to fly away).
+    @State private var lastTranslation: CGFloat = 0
     
     var body: some View {
         ZStack {
@@ -368,17 +372,21 @@ struct NativeResizeHandle: View {
                 .onChanged { value in
                     if !isDragging {
                         isDragging = true
+                        lastTranslation = 0
                     }
                     
-                    // Calculate delta based on translation
-                    let delta = isVertical ? value.translation.width : value.translation.height
-                    let deltaRatio = delta / containerSize
+                    // Use the cumulative translation to derive the delta since
+                    // the last event, not since drag start.
+                    let cumulative = isVertical ? value.translation.width : value.translation.height
+                    let delta = cumulative - lastTranslation
+                    lastTranslation = cumulative
                     
-                    // Apply change
-                    onDrag(deltaRatio)
+                    guard containerSize > 0 else { return }
+                    onDrag(delta / containerSize)
                 }
                 .onEnded { _ in
                     isDragging = false
+                    lastTranslation = 0
                 }
         )
     }

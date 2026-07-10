@@ -1,52 +1,58 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+struct ItemFramePreferenceKey: PreferenceKey {
+    static let defaultValue: [DirectoryItem.ID: CGRect] = [:]
+    static func reduce(value: inout [DirectoryItem.ID: CGRect], nextValue: () -> [DirectoryItem.ID: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
 struct DirectoryGridView: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     @Binding var selectedItems: Set<DirectoryItem.ID>
     @Binding var sortOrder: [KeyPathComparator<DirectoryItem>]
     var quickLookAction: ((URL) -> Void)?
 
-    @StateObject private var audioPlayer = AudioPlayerService.shared
     @State private var hoveredItemID: DirectoryItem.ID?
     @State private var isDropTargeted: Bool = false
     @FocusState private var isFocused: Bool
     @State private var containerWidth: CGFloat = 800
+    @State private var cachedItemsPerRow: Int = 6
+    @State private var hoverDebounceTask: Task<Void, Never>?
+
+    // Marquee selection state
+    @State private var marqueeStart: CGPoint?
+    @State private var marqueeCurrent: CGPoint?
+    @State private var itemFrames: [DirectoryItem.ID: CGRect] = [:]
+    @State private var initialSelectionAtMarqueeStart: Set<DirectoryItem.ID> = []
 
     // Grid configuration
     private let columns = [
         GridItem(.adaptive(minimum: 100, maximum: 120), spacing: 16)
     ]
-    
-    // Calculate number of columns based on actual container width
-    private var itemsPerRow: Int {
+
+    /// Recompute cached column count when container width changes.
+    private func updateItemsPerRow() {
         let itemMinWidth: CGFloat = 100
         let itemMaxWidth: CGFloat = 120
         let spacing: CGFloat = 16
-        let padding: CGFloat = 32 // 16 padding on each side
-        
+        let padding: CGFloat = 32
         let availableWidth = containerWidth - padding
-        
-        // Calculate how many items fit at minimum width
         let maxColumns = Int(availableWidth / (itemMinWidth + spacing))
-        
-        // Calculate actual item width with spacing
         let actualItemWidth = (availableWidth - CGFloat(maxColumns - 1) * spacing) / CGFloat(maxColumns)
-        
-        // If actual width exceeds max, reduce column count
         if actualItemWidth > itemMaxWidth {
-            let adjustedColumns = Int(availableWidth / (itemMaxWidth + spacing))
-            return max(1, adjustedColumns)
+            cachedItemsPerRow = max(1, Int(availableWidth / (itemMaxWidth + spacing)))
+        } else {
+            cachedItemsPerRow = max(1, maxColumns)
         }
-        
-        return max(1, maxColumns)
     }
 
     var body: some View {
         GeometryReader { geometry in
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(viewModel.sortedItems) { item in
+                    ForEach(viewModel.sortedItems, id: \.id) { item in
                         GridItemView(
                             item: item,
                             isSelected: selectedItems.contains(item.id),
@@ -55,6 +61,15 @@ struct DirectoryGridView: View {
                             selectedItems: $selectedItems,
                             quickLookAction: quickLookAction
                         )
+                        .id(item.id)
+                        .background(
+                            GeometryReader { geo in
+                                Color.clear.preference(
+                                    key: ItemFramePreferenceKey.self,
+                                    value: [item.id: geo.frame(in: .named("grid"))]
+                                )
+                            }
+                        )
                         .onTapGesture {
                             handleTap(item: item)
                         }
@@ -62,15 +77,60 @@ struct DirectoryGridView: View {
                             handleDoubleTap(item: item)
                         }
                         .onHover { hovering in
-                            hoveredItemID = hovering ? item.id : nil
+                            handleHover(item: item, hovering: hovering)
                         }
                         .draggable(makeDraggedFiles(for: item))
                     }
                 }
+                .transaction { t in t.animation = nil } // Disable implicit animations
                 .padding()
+                .background(
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            // Clear selection when clicking background
+                            withTransaction(Transaction(animation: nil)) {
+                                selectedItems.removeAll()
+                            }
+                        }
+                )
             }
+            .coordinateSpace(name: "grid")
+            .onPreferenceChange(ItemFramePreferenceKey.self) { frames in
+                itemFrames = frames
+            }
+            .overlay(
+                // Marquee Rectangle
+                Group {
+                    if let start = marqueeStart, let current = marqueeCurrent {
+                        let rect = marqueeRect(from: start, to: current)
+                        Rectangle()
+                            .stroke(Color.accentColor, lineWidth: 1)
+                            .background(Color.accentColor.opacity(0.1))
+                            .frame(width: rect.width, height: rect.height)
+                            .position(x: rect.midX, y: rect.midY)
+                    }
+                }
+            )
+            .gesture(
+                DragGesture(minimumDistance: 5)
+                    .onChanged { value in
+                        if marqueeStart == nil {
+                            marqueeStart = value.startLocation
+                            initialSelectionAtMarqueeStart = selectedItems
+                        }
+                        marqueeCurrent = value.location
+                        updateSelectionForMarquee()
+                    }
+                    .onEnded { _ in
+                        marqueeStart = nil
+                        marqueeCurrent = nil
+                        initialSelectionAtMarqueeStart = []
+                    }
+            )
             .onAppear {
                 containerWidth = geometry.size.width
+                updateItemsPerRow()
             }
             .onChange(of: geometry.size.width) { _, newWidth in
                 // Use a transaction to ensure smooth updates
@@ -78,6 +138,7 @@ struct DirectoryGridView: View {
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
                     containerWidth = newWidth
+                    updateItemsPerRow()
                 }
             }
         }
@@ -167,9 +228,9 @@ struct DirectoryGridView: View {
         case .right:
             newIndex = min(items.count - 1, currentIndex + 1)
         case .up:
-            newIndex = max(0, currentIndex - itemsPerRow)
+            newIndex = max(0, currentIndex - cachedItemsPerRow)
         case .down:
-            newIndex = min(items.count - 1, currentIndex + itemsPerRow)
+            newIndex = min(items.count - 1, currentIndex + cachedItemsPerRow)
         }
         
         // Only update if the index changed
@@ -190,10 +251,9 @@ struct DirectoryGridView: View {
     }
 
     private func handleTap(item: DirectoryItem) {
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        
-        withTransaction(transaction) {
+       
+        // Immediate update, no animation delay
+        withTransaction(Transaction(animation: nil)) {
             if NSEvent.modifierFlags.contains(.command) {
                 // Toggle selection
                 if selectedItems.contains(item.id) {
@@ -214,6 +274,31 @@ struct DirectoryGridView: View {
     private func handleDoubleTap(item: DirectoryItem) {
         viewModel.openItem(item)
     }
+    
+    private func handleHover(item: DirectoryItem, hovering: Bool) {
+        // Cancel any pending hover task
+        hoverDebounceTask?.cancel()
+
+        // Immediate update without animation
+        withTransaction(Transaction(animation: nil)) {
+            if hovering {
+                // Set immediately for hover-in
+                hoveredItemID = item.id
+            } else {
+                // Set immediately for hover-out
+                hoveredItemID = nil
+            }
+        }
+
+        // Preload directory contents after a short dwell time so fast mouse
+        // movement doesn't trigger unnecessary fetches.
+        guard hovering, item.isDirectory, !item.isAppBundle else { return }
+        hoverDebounceTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(250))
+            guard !Task.isCancelled else { return }
+            viewModel.preloadDirectory(at: item.url)
+        }
+    }
 
     private func makeDraggedFiles(for item: DirectoryItem) -> DraggedFiles {
         let urlsToDrag: [URL]
@@ -231,6 +316,51 @@ struct DirectoryGridView: View {
         }
         return DraggedFiles(urls: urlsToDrag)
     }
+    
+    // MARK: - Marquee Helpers
+    
+    private func marqueeRect(from: CGPoint, to: CGPoint) -> CGRect {
+        CGRect(
+            x: min(from.x, to.x),
+            y: min(from.y, to.y),
+            width: abs(from.x - to.x),
+            height: abs(from.y - to.y)
+        )
+    }
+    
+    private func updateSelectionForMarquee() {
+        guard let start = marqueeStart, let current = marqueeCurrent else { return }
+        let rect = marqueeRect(from: start, to: current)
+        
+        let commandPressed = NSEvent.modifierFlags.contains(.command)
+        let shiftPressed = NSEvent.modifierFlags.contains(.shift)
+        
+        var newSelection = initialSelectionAtMarqueeStart
+        
+        for (id, frame) in itemFrames {
+            if rect.intersects(frame) {
+                newSelection.insert(id)
+            } else if !commandPressed && !shiftPressed {
+                // If not multi-selecting, remove items not in rect
+                if !initialSelectionAtMarqueeStart.contains(id) {
+                    newSelection.remove(id)
+                }
+            }
+        }
+        
+        // Final pass for non-multi-select: only items in rect or previously selected (if multi)
+        if !commandPressed && !shiftPressed {
+            for id in newSelection {
+                if let frame = itemFrames[id], !rect.intersects(frame) {
+                    newSelection.remove(id)
+                }
+            }
+        }
+
+        withTransaction(Transaction(animation: nil)) {
+            selectedItems = newSelection
+        }
+    }
 }
 
 // MARK: - Grid Item View
@@ -242,14 +372,15 @@ struct GridItemView: View {
     @Binding var selectedItems: Set<DirectoryItem.ID>
     var quickLookAction: ((URL) -> Void)?
 
-    @StateObject private var audioPlayer = AudioPlayerService.shared
+    var audioPlayer = AudioPlayerService.shared
     @State private var isDropTargeted = false
     @State private var showProgressRing = false
     @State private var isPressed = false
     @State private var optimisticPlayState: Bool?
+    @State private var cachedIsPlayable: Bool = false
 
     private var isPlayable: Bool {
-        audioPlayer.isPlayableMedia(item)
+        cachedIsPlayable
     }
 
     private var isCurrentlyPlaying: Bool {
@@ -373,6 +504,7 @@ struct GridItemView: View {
             }
             .onAppear {
                 showProgressRing = isCurrentFile
+                cachedIsPlayable = audioPlayer.isPlayableMedia(item)
             }
 
             // Name
@@ -390,8 +522,12 @@ struct GridItemView: View {
         .frame(width: 100, height: 100)
         .padding(2)
         .background(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: 10)
                 .fill(backgroundFill)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(borderColor, lineWidth: 1)
+                )
         )
         .contextMenu {
             DirectoryContextMenuItems(
@@ -408,7 +544,7 @@ struct GridItemView: View {
                 var files: [URL] = []
 
                 for provider in providers {
-                    if let urls = try? await loadFileURLs(from: provider) {
+                    if let urls = try? await provider.loadFileURLs() {
                         for url in urls {
                             if item.url == url {
                                 continue
@@ -430,75 +566,26 @@ struct GridItemView: View {
 
     private var backgroundFill: Color {
         if isDropTargeted && item.isDirectory {
-            return Color.accentColor.opacity(0.25)
+            return Color.accentColor.opacity(0.15)
         } else if isSelected {
-            return Color.primary.opacity(0.15)
+            return Color.accentColor.opacity(0.12)
         } else if isHovered {
-            return Color.accentColor.opacity(0.05)
+            return Color.primary.opacity(0.05)
         } else {
             return Color.clear
         }
     }
 
     private var borderColor: Color {
-        isSelected ? Color.accentColor : Color.clear
-    }
-
-    private func loadFileURLs(from provider: NSItemProvider) async throws
-        -> [URL]
-    {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(
-                forTypeIdentifier: UTType.fileURL.identifier,
-                options: nil
-            ) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                if let url = data as? URL {
-                    continuation.resume(returning: [url])
-                    return
-                }
-
-                if let data = data as? Data {
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(
-                        ofClasses: [NSArray.self, NSURL.self],
-                        from: data
-                    ) as? [URL] {
-                        continuation.resume(returning: urls)
-                        return
-                    }
-
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(
-                        ofClass: NSURL.self,
-                        from: data
-                    ) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-
-                    if let url = URL(dataRepresentation: data, relativeTo: nil)
-                    {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                }
-
-                continuation.resume(
-                    throwing: NSError(
-                        domain: "InvalidData",
-                        code: 0,
-                        userInfo: [
-                            NSLocalizedDescriptionKey:
-                                "Could not decode URL from drag data"
-                        ]
-                    )
-                )
-            }
+        if isDropTargeted && item.isDirectory {
+            return Color.accentColor.opacity(0.5)
+        } else if isSelected {
+            return Color.accentColor.opacity(0.3)
+        } else {
+            return Color.clear
         }
     }
+
 }
 
 // MARK: - Grid Drop Delegate
@@ -513,9 +600,7 @@ struct GridDropDelegate: DropDelegate {
             var urls: [URL] = []
 
             for itemProvider in itemProviders {
-                if let urlsFromProvider = try? await loadFileURLs(
-                    from: itemProvider
-                ) {
+                if let urlsFromProvider = try? await itemProvider.loadFileURLs() {
                     urls.append(contentsOf: urlsFromProvider)
                 }
             }
@@ -529,62 +614,6 @@ struct GridDropDelegate: DropDelegate {
             }
         }
         return true
-    }
-
-    private func loadFileURLs(from provider: NSItemProvider) async throws
-        -> [URL]
-    {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(
-                forTypeIdentifier: UTType.fileURL.identifier,
-                options: nil
-            ) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-
-                if let url = data as? URL {
-                    continuation.resume(returning: [url])
-                    return
-                }
-
-                if let data = data as? Data {
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(
-                        ofClasses: [NSArray.self, NSURL.self],
-                        from: data
-                    ) as? [URL] {
-                        continuation.resume(returning: urls)
-                        return
-                    }
-
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(
-                        ofClass: NSURL.self,
-                        from: data
-                    ) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-
-                    if let url = URL(dataRepresentation: data, relativeTo: nil)
-                    {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                }
-
-                continuation.resume(
-                    throwing: NSError(
-                        domain: "InvalidData",
-                        code: 0,
-                        userInfo: [
-                            NSLocalizedDescriptionKey:
-                                "Could not decode URL from drag data"
-                        ]
-                    )
-                )
-            }
-        }
     }
 
     func dropEntered(info: DropInfo) {}

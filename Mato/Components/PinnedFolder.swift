@@ -6,23 +6,29 @@
 //
 
 import Foundation
+import Observation
+import os
 
 struct PinnedFolder: Identifiable, Codable, Hashable {
     let id: UUID
     let url: URL
     let name: String
+    var icon: String
     
-    init(url: URL, name: String? = nil) {
+    init(url: URL, name: String? = nil, icon: String = "folder") {
         self.id = UUID()
         self.url = url
         self.name = name ?? url.lastPathComponent
+        self.icon = icon
     }
 }
 
 @MainActor
-class PinnedFolderStore: ObservableObject {
-    @Published var pinnedFolders: [PinnedFolder] = []
-    private let storeKey = "pinnedFolders"
+@Observable
+class PinnedFolderStore {
+    var pinnedFolders: [PinnedFolder] = []
+    @ObservationIgnored private let storeKey = "pinnedFolders"
+    private let log = Logger(subsystem: "com.mato.app", category: "pinned")
     
     static let shared = PinnedFolderStore()
     
@@ -51,6 +57,22 @@ class PinnedFolderStore: ObservableObject {
         }
     }
     
+    func movePinnedFolder(from source: Int, to destination: Int) {
+        guard source < pinnedFolders.count && destination < pinnedFolders.count else { return }
+        let folder = pinnedFolders.remove(at: source)
+        pinnedFolders.insert(folder, at: destination)
+        savePinnedFolders()
+    }
+    
+    func updatePinnedFolderIcon(with id: UUID, icon: String) {
+        if let index = pinnedFolders.firstIndex(where: { $0.id == id }) {
+            var updatedFolder = pinnedFolders[index]
+            updatedFolder.icon = icon
+            pinnedFolders[index] = updatedFolder
+            savePinnedFolders()
+        }
+    }
+    
     private func loadPinnedFolders() {
         guard let data = UserDefaults.standard.data(forKey: storeKey) else { return }
         
@@ -58,7 +80,7 @@ class PinnedFolderStore: ObservableObject {
             let decoder = JSONDecoder()
             pinnedFolders = try decoder.decode([PinnedFolder].self, from: data)
         } catch {
-            print("Failed to load pinned folders: \(error.localizedDescription)")
+            log.error("Failed to load pinned folders: \(error.localizedDescription, privacy: .public)")
         }
     }
     
@@ -68,7 +90,7 @@ class PinnedFolderStore: ObservableObject {
             let data = try encoder.encode(pinnedFolders)
             UserDefaults.standard.set(data, forKey: storeKey)
         } catch {
-            print("Failed to save pinned folders: \(error.localizedDescription)")
+            log.error("Failed to save pinned folders: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

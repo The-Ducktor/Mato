@@ -8,18 +8,22 @@
 import Foundation
 import AVFoundation
 import UniformTypeIdentifiers
+import Observation
+import os
 
 @MainActor
-class AudioPlayerService: ObservableObject {
+@Observable
+class AudioPlayerService {
     static let shared = AudioPlayerService()
     
-    @Published var currentlyPlayingURL: URL?
-    @Published var isPlaying: Bool = false
-    @Published var currentTime: TimeInterval = 0
-    @Published var duration: TimeInterval = 0
+    var currentlyPlayingURL: URL?
+    var isPlaying: Bool = false
+    var currentTime: TimeInterval = 0
+    var duration: TimeInterval = 0
     
-    private var audioPlayer: AVAudioPlayer?
-    private var progressTimer: Timer?
+    @ObservationIgnored private var audioPlayer: AVAudioPlayer?
+    @ObservationIgnored private var progressTimer: Timer?
+    private let log = Logger(subsystem: "com.mato.app", category: "audio")
     
     private init() {}
     
@@ -68,7 +72,7 @@ class AudioPlayerService: ObservableObject {
         do {
             // Check if file exists
             guard FileManager.default.fileExists(atPath: url.path) else {
-                print("Audio file not found: \(url.path)")
+                log.warning("Audio file not found: \(url.path, privacy: .public)")
                 return
             }
             
@@ -93,7 +97,7 @@ class AudioPlayerService: ObservableObject {
                 }
             }
         } catch {
-            print("Failed to play audio: \(error.localizedDescription)")
+            log.error("Failed to play audio: \(error.localizedDescription, privacy: .public)")
             stop()
         }
     }
@@ -128,9 +132,11 @@ class AudioPlayerService: ObservableObject {
     /// Start the progress timer
     private func startProgressTimer() {
         stopProgressTimer()
+        // scheduledTimer's block is @Sendable, so we must explicitly hop to
+        // @MainActor to access the main-actor-isolated properties.
         progressTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self = self, let player = self.audioPlayer else { return }
+                guard let self, let player = self.audioPlayer else { return }
                 self.currentTime = player.currentTime
             }
         }

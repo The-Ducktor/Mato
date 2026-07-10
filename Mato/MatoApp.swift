@@ -12,6 +12,9 @@ struct MatoApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    MatoTips.configure()
+                }
         }
 
         Settings {

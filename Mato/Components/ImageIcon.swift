@@ -5,106 +5,95 @@ import UniformTypeIdentifiers
 struct ImageIcon: View {
     @Binding var item: DirectoryItem
     var isPlayable: Bool = false
-    
-    @StateObject private var thumbnailLoader = SimpleThumbnailLoader()
+
     @State private var thumbnail: NSImage?
     @State private var isLoading = false
-    
+
+    // Shared loader — its NSCache (500 items / 100 MB) is shared across all cells.
+    private static let sharedLoader = SimpleThumbnailLoader()
+
     var body: some View {
         Group {
-            if let thumbnail = thumbnail {
+            if let thumbnail {
                 Image(nsImage: thumbnail)
                     .resizable()
-                    
                     .aspectRatio(contentMode: .fit)
                     .cornerRadius(3)
-                    
-                  
-            } else if isLoading {
-                ZStack {
-                    
-                    Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
-                        .resizable()
-                        .aspectRatio(contentMode: .fit).scaleEffect(0.5)
-                    ProgressView()
-                        .controlSize(.small)
-                }
-               
             } else {
-                Image(nsImage: NSWorkspace.shared.icon(forFile: item.url.path))
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
+                ZStack {
+                    Image(nsImage: ImageIcon.cachedWorkspaceIcon(for: item.url))
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .scaleEffect(isLoading ? 0.5 : 1.0)
+
+                    if isLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                }
             }
         }
+        // .task(id:) automatically cancels and restarts when item.id changes,
+        // and cancels when the view disappears — no manual Task tracking needed.
         .task(id: item.id) {
             await loadThumbnail()
         }
     }
-    
+
     private func loadThumbnail() async {
-        // Skip thumbnail generation for directories or text-based files
-        guard !item.isDirectory && !item.isTextBasedFile else {
-            thumbnail = NSWorkspace.shared.icon(forFile: item.url.path)
-            return
-        }
-        
+        guard !item.isDirectory && !item.isTextBasedFile else { return }
+
         isLoading = true
-        defer { isLoading = false }
-        
+
+        let options = SimpleThumbnailLoader.ThumbnailOptions(
+            size: CGSize(width: 128, height: 128),
+            scale: 2.0,
+            maintainAspectRatio: true
+        )
+
         do {
-            let options = SimpleThumbnailLoader.ThumbnailOptions(
-                size: CGSize(width: 256, height: 256),
-                scale: 2.0,
-                maintainAspectRatio: true
-            )
-            let loader = thumbnailLoader
-            let url = item.url
-            // Run thumbnail generation on background thread
-            thumbnail = try await Task.detached {
-                try await loader.generateThumbnail(for: url, options: options)
-            }.value
+            // generateThumbnail is @concurrent — this call hops off the main
+            // actor onto the cooperative thread pool. QuickLook decode never
+            // blocks scrolling or any other UI work.
+            let loaded = try await Self.sharedLoader.generateThumbnail(for: item.url, options: options)
+
+            // Use MainThreadGate to deliver the thumbnail only when the main
+            // thread is free (not busy with scroll tracking). During rapid
+            // scrolling, updates are batched and applied once tracking ends,
+            // preventing view-update storms that cause stuttering.
+            MainThreadGate.shared.schedule {
+                self.thumbnail = loaded
+                self.isLoading = false
+            }
         } catch {
-            // Fallback to system icon on error
-            thumbnail = NSWorkspace.shared.icon(forFile: item.url.path)
+            // Cancellation or QuickLook failure — clear loading state.
+            isLoading = false
         }
+    }
+}
+
+extension ImageIcon {
+    // Shared icon cache to avoid redundant NSWorkspace calls
+    private static let iconCache = NSCache<NSURL, NSImage>()
+
+    static func cachedWorkspaceIcon(for url: URL) -> NSImage {
+        if let cached = iconCache.object(forKey: url as NSURL) {
+            return cached
+        }
+        let icon = NSWorkspace.shared.icon(forFile: url.path(percentEncoded: false))
+        iconCache.setObject(icon, forKey: url as NSURL)
+        return icon
     }
 }
 
 extension DirectoryItem {
     var isTextBasedFile: Bool {
-        // Get the UTType for the file
-        guard let contentType = try? url.resourceValues(forKeys: [.contentTypeKey]).contentType else {
-            // Fallback to extension-based check
-            return isTextBasedByExtension
-        }
-        
-        // Check if the file conforms to text, source code, or script types
-        return contentType.conforms(to: UTType.text) ||
-               contentType.conforms(to: UTType.sourceCode) ||
-               contentType.conforms(to: UTType.script) ||
-               contentType.conforms(to: UTType.plainText) ||
-               contentType.conforms(to: UTType.json) ||
-               contentType.conforms(to: UTType.xml) ||
-               contentType.conforms(to: UTType.yaml)
-    }
-    
-    private var isTextBasedByExtension: Bool {
-        let textExtensions = [
-            // Programming languages
-            "swift", "py", "java", "js", "ts", "jsx", "tsx", "cpp", "c", "h", "hpp",
-            "cs", "rb", "go", "rs", "php", "kt", "scala", "m", "mm",
-            // Scripting
-            "sh", "bash", "zsh", "fish", "pl", "lua",
-            // Web
-            "html", "css", "scss", "sass", "less", "vue", "svelte",
-            // Data/Config
-            "json", "xml", "yaml", "yml", "toml", "ini", "conf", "config",
-            // Documentation
-            "md", "txt", "log", "csv", "tsv", "rst",
-            // Other
-            "sql", "gradle", "properties", "env"
-        ]
-        return textExtensions.contains(url.pathExtension.lowercased())
+        return fileType.conforms(to: .text) ||
+               fileType.conforms(to: .sourceCode) ||
+               fileType.conforms(to: .script) ||
+               fileType.conforms(to: .plainText) ||
+               fileType.conforms(to: .json) ||
+               fileType.conforms(to: .xml) ||
+               fileType.conforms(to: .yaml)
     }
 }
- 

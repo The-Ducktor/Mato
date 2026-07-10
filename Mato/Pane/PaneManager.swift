@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import Observation
 
 // MARK: - Pane Layout
 enum PaneLayout: Codable {
@@ -18,10 +19,11 @@ enum PaneLayout: Codable {
 
 // MARK: - Pane Manager
 @MainActor
-class PaneManager: ObservableObject {
-    @Published var panes: [DirectoryViewModel] = []
-    @Published var activePaneIndex: Int = 0
-    @Published var layout: PaneLayout = .dual
+@Observable
+class PaneManager {
+    var panes: [DirectoryViewModel] = []
+    var activePaneIndex: Int = 0
+    var layout: PaneLayout = .dual
     
     var paneCount: Int { panes.count }
     

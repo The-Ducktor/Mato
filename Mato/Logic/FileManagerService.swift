@@ -8,10 +8,32 @@
 import Foundation
 import UniformTypeIdentifiers
 import AppKit
+import os
+
+private protocol AnyTask: Sendable {
+    func cancel()
+}
+extension Task: AnyTask {}
+
+/// Actor to manage task cancellation safely in Swift 6
+private actor TaskCancellationManager: Sendable {
+    private var activeTasks: [URL: any AnyTask] = [:]
+
+    func cancelPendingOperations(for directory: URL) {
+        activeTasks[directory]?.cancel()
+        activeTasks.removeValue(forKey: directory)
+    }
+
+    func trackTask(_ task: some AnyTask, for directory: URL) {
+        activeTasks[directory] = task
+    }
+}
 
 final class FileManagerService: @unchecked Sendable {
     static let shared = FileManagerService()
     private let fileManager = FileManager.default
+    private let log = Logger(subsystem: "com.mato", category: "filemanager")
+    private nonisolated let taskManager = TaskCancellationManager()
     
     private init() {}
     
@@ -19,19 +41,39 @@ final class FileManagerService: @unchecked Sendable {
         return fileManager.urls(for: .downloadsDirectory, in: .userDomainMask).first
     }
     
+    // Cancel any pending operations for a specific directory
+    func cancelPendingOperations(for directory: URL) {
+        // Note: This is non-blocking as it's an actor call
+        Task.detached { [taskManager] in
+            await taskManager.cancelPendingOperations(for: directory)
+        }
+    }
+    
     func getContents(of directory: URL) async throws -> [DirectoryItem] {
-        return try await Task.detached(priority: .userInitiated) { [self, fileManager] in
+        // Cancel any previous request for this directory
+        await taskManager.cancelPendingOperations(for: directory)
+        
+        let task = Task.detached(priority: .userInitiated) { [self, fileManager] in
+            // contentsOfDirectory(includingPropertiesForKeys:) pre-populates the URL
+            // resource cache for each key — calling url.resourceValues(forKeys:) again
+            // per file would re-fetch the same data from disk unnecessarily.
             let contents = try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [
                 .isDirectoryKey,
                 .fileSizeKey,
                 .contentTypeKey,
                 .contentModificationDateKey,
-                .creationDateKey
+                .creationDateKey,
+                .isHiddenKey,
+                .addedToDirectoryDateKey,
+                .isApplicationKey,
+                .nameKey
             ])
 
             var items: [DirectoryItem] = []
             for url in contents {
+                try Task.checkCancellation()
                 do {
+                    // Read from the already-populated URL resource cache.
                     let resourceValues = try url.resourceValues(forKeys: [
                         .isDirectoryKey,
                         .fileSizeKey,
@@ -46,11 +88,18 @@ final class FileManagerService: @unchecked Sendable {
                     let item = self.makeDirectoryItem(from: url, with: resourceValues)
                     items.append(item)
                 } catch {
-                    print("Error getting attributes for \(url): \(error)")
+                    if (error as NSError).code != NSFileNoSuchFileError {
+                        log.error("Error getting attributes for \(url, privacy: .public): \(error.localizedDescription, privacy: .public)")
+                    }
                 }
             }
             return items
-        }.value
+        }
+        
+        // Track the real task so cancellation actually works.
+        await taskManager.trackTask(task, for: directory)
+        
+        return try await task.value
     }
     
     @MainActor
@@ -58,36 +107,6 @@ final class FileManagerService: @unchecked Sendable {
         NSWorkspace.shared.open(url)
     }
     
-    // Now executes file operations in the background using detached tasks.
-    // Move or copy files to a destination directory
-    func moveItems(from sourceURLs: [URL], to destinationDirectory: URL, copy: Bool = false) async throws -> Bool {
-        await Task.detached(priority: .userInitiated) {
-            var success = true
-            let fm = FileManager.default
-
-            for sourceURL in sourceURLs {
-                let destinationURL = destinationDirectory.appendingPathComponent(sourceURL.lastPathComponent)
-
-                do {
-                    if fm.fileExists(atPath: destinationURL.path) {
-                        print("File already exists at destination: \(destinationURL.path)")
-                        continue
-                    }
-
-                    if copy {
-                        try fm.copyItem(at: sourceURL, to: destinationURL)
-                    } else {
-                        try fm.moveItem(at: sourceURL, to: destinationURL)
-                    }
-                } catch {
-                    print("Error moving/copying \(sourceURL) to \(destinationURL): \(error)")
-                    success = false
-                }
-            }
-            return success
-        }.value
-    }
-
     func getDirectoryItem(for url: URL) async throws -> DirectoryItem {
         return try await Task.detached(priority: .userInitiated) { [self] in
             let resourceValues = try url.resourceValues(forKeys: [

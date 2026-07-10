@@ -14,13 +14,12 @@ struct DraggedFiles: Transferable {
 }
 
 struct DirectoryTableView: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     @Binding var selectedItems: Set<DirectoryItem.ID>
     @Binding var sortOrder: [KeyPathComparator<DirectoryItem>]
     @State private var color: Color = .clear // testing
     @State private var isDropTargeted: Bool = false
     @State private var hoveredFolderID: DirectoryItem.ID? = nil
-    @State private var tableRebuildID = UUID() // Force table rebuild on sort changes
     @State private var sortUpdateTask: Task<Void, Never>? = nil // Debounce sort updates
     @State private var localSortOrder: [KeyPathComparator<DirectoryItem>] = [] // Local copy to prevent binding conflicts
     @State private var isProcessingSortChange = false // Prevent re-entrant updates
@@ -64,12 +63,12 @@ struct DirectoryTableView: View {
                 .customizationID("kind")
 
                 TableColumn("Date Modified", value: \.lastModified) { item in
-                    Text(formatDate(item.lastModified))
+                    Text(item.formattedLastModified)
                 }
                 .customizationID("dateModified")
                 
                 TableColumn("Date Created", value: \.creationDate) { item in
-                    Text(formatDate(item.creationDate))
+                    Text(item.formattedCreationDate)
                 }
                 .width(min: 150)
                 .alignment(.trailing)
@@ -77,7 +76,7 @@ struct DirectoryTableView: View {
                 .defaultVisibility(.hidden)
                 
                 TableColumn("Date Added", value: \.addedDate) { item in
-                    Text(formatDate(item.addedDate))
+                    Text(item.formattedAddedDate)
                 }
                 .width(min: 150)
                 .alignment(.trailing)
@@ -88,7 +87,7 @@ struct DirectoryTableView: View {
                     "Last Accessed",
                     value: \.dateLastAccessed
                 ) { item in
-                    Text(formatDate(item.dateLastAccessed))
+                    Text(item.formattedLastAccessed)
                 }
                 .width(min: 150)
                 .alignment(.trailing)
@@ -100,8 +99,7 @@ struct DirectoryTableView: View {
                         .draggable(makeDraggedFiles(for: item))
                 }
             }
-            .id(tableRebuildID) // Force complete rebuild when this changes
-            .animation(.none, value: localSortOrder) // Disable animations on sort order changes to prevent crashes
+            .animation(.none, value: localSortOrder) // Disable animations on sort order changes
             .onDrop(of: [UTType.fileURL], delegate: TableDropDelegate(viewModel: viewModel))
             .onAppear {
                 // Initialize local sort order from binding
@@ -118,23 +116,19 @@ struct DirectoryTableView: View {
                 // Immediately clear selection to prevent index issues
                 selectedItems.removeAll()
                 
-                // Update immediately - no delay needed since we're disabling animations
+                // Update sort order - SwiftUI will handle row updates efficiently
                 sortUpdateTask = Task { @MainActor in
                     guard !Task.isCancelled else {
                         isProcessingSortChange = false
                         return
                     }
                     
-                    // Disable animations and update sort order immediately to prevent table crashes
+                    // Update without forcing complete rebuild
                     var transaction = Transaction()
                     transaction.disablesAnimations = true
                     withTransaction(transaction) {
-                        // Update the view model
                         viewModel.setSortOrder(newValue)
-                        // Update the external binding
                         sortOrder = newValue
-                        // Force complete table rebuild by changing the ID
-                        tableRebuildID = UUID()
                     }
                     
                     isProcessingSortChange = false
@@ -146,13 +140,11 @@ struct DirectoryTableView: View {
                 localSortOrder = newValue
             }
             .onChange(of: viewModel.currentDirectory) { _, _ in
-                // Clear selection when changing directories to prevent stale references
+                // Clear selection when changing directories
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
                     selectedItems.removeAll()
-                    // Force table rebuild on directory change
-                    tableRebuildID = UUID()
                 }
             }
         }
@@ -175,83 +167,29 @@ struct DirectoryTableView: View {
         return DraggedFiles(urls: urlsToDrag)
     }
 
-    private func loadFileURL(from provider: NSItemProvider) async throws -> URL {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                // Handle different data types
-                if let url = data as? URL {
-                    // Direct URL object
-                    continuation.resume(returning: url)
-                    return
-                }
-                
-                if let data = data as? Data {
-                    // Try to unarchive the URL from NSKeyedArchiver format
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: url)
-                        return
-                    }
-                    
-                    // Try to unarchive an array of URLs
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL],
-                       let firstURL = urls.first {
-                        continuation.resume(returning: firstURL)
-                        return
-                    }
-                    
-                    // Fallback: try URL(dataRepresentation:)
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: url)
-                        return
-                    }
-                }
-                
-                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
-            }
-        }
-    }
-
-
-    // Cache formatters to avoid recreating them for every cell
-    private static let relativeDateFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter
-    }()
-    
-    private static let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
-        return formatter
-    }()
-
-    private func formatDate(_ date: Date) -> String {
-        let now = Date()
-        let calendar = Calendar.current
-        
-        if calendar.isDateInToday(date) || calendar.isDateInYesterday(date) || calendar.isDateInTomorrow(date) {
-            return Self.relativeDateFormatter.localizedString(for: date, relativeTo: now)
-        } else {
-            return Self.dateFormatter.string(from: date)
-        }
-    }
+    // Date formatting is now handled by DirectoryItem for better performance
     
 }
 
-// Separate view component for Name cell to properly handle @State
-struct NameCellView: View {
+// MARK: - Name Cell with hovers and drop target
+
+// Separate view component for Name cell with Equatable for performance
+@MainActor struct NameCellView: View, Equatable {
     let item: DirectoryItem
-    let viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     let selectedItems: Set<DirectoryItem.ID>
     @Binding var hoveredFolderID: DirectoryItem.ID?
     @Binding var color: Color
     @State private var isRowTargeted = false
+    @State private var hoverPreloadTask: Task<Void, Never>?
+    
+    // Implement Equatable to prevent unnecessary re-renders
+    // Note: @Binding properties are main-actor-isolated and can't be
+    // compared from a nonisolated context, so we skip hover state here.
+    nonisolated static func == (lhs: NameCellView, rhs: NameCellView) -> Bool {
+        lhs.item.id == rhs.item.id &&
+        lhs.selectedItems == rhs.selectedItems
+    }
     
     var body: some View {
         HStack {
@@ -267,14 +205,23 @@ struct NameCellView: View {
             RoundedRectangle(cornerRadius: 4)
                 .fill(isRowTargeted && item.isDirectory ? Color.accentColor.opacity(0.25) : Color.clear)
         )
+        .onHover { hovering in
+            hoverPreloadTask?.cancel()
+            guard hovering, item.isDirectory, !item.isAppBundle else { return }
+            hoverPreloadTask = Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                viewModel.preloadDirectory(at: item.url)
+            }
+        }
         .onDrop(of: [UTType.fileURL], isTargeted: $isRowTargeted) { providers in
             guard item.isDirectory else { return false }
 
-            Task {
+            Task { @MainActor in
                 var files: [URL] = []
 
                 for provider in providers {
-                    if let urls = try? await loadFileURLs(from: provider) {
+                    if let urls = try? await provider.loadFileURLs() {
                         for url in urls {
                             if item.url == url {
                                 continue
@@ -291,52 +238,7 @@ struct NameCellView: View {
                     color = .green
                 }
             }
-            return true
-        }
-        .onChange(of: isRowTargeted) { _, newValue in
-            if newValue && item.isDirectory {
-                hoveredFolderID = item.id
-            } else if hoveredFolderID == item.id {
-                hoveredFolderID = nil
-            }
-        }
-    }
-    
-    private func loadFileURLs(from provider: NSItemProvider) async throws -> [URL] {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                if let url = data as? URL {
-                    continuation.resume(returning: [url])
-                    return
-                }
-                
-                if let data = data as? Data {
-                    // Try to unarchive an ARRAY of URLs first (multi-select case)
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
-                        continuation.resume(returning: urls)
-                        return
-                    }
-                    
-                    // Try to unarchive a single URL
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                    
-                    // Fallback: try URL(dataRepresentation:)
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                }
-                
-                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
-            }
+        return true
         }
     }
 }
@@ -354,7 +256,7 @@ struct TableDropDelegate: DropDelegate {
             var urls: [URL] = []
             
             for itemProvider in itemProviders {
-                if let urlsFromProvider = try? await loadFileURLs(from: itemProvider) {
+                if let urlsFromProvider = try? await itemProvider.loadFileURLs() {
                     urls.append(contentsOf: urlsFromProvider)
                 }
             }
@@ -373,45 +275,6 @@ struct TableDropDelegate: DropDelegate {
             }
         }
         return true
-    }
-    
-    private func loadFileURLs(from provider: NSItemProvider) async throws -> [URL] {
-        try await withCheckedThrowingContinuation { continuation in
-            provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { (data, error) in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                
-                // Handle different data types
-                if let url = data as? URL {
-                    continuation.resume(returning: [url])
-                    return
-                }
-                
-                if let data = data as? Data {
-                    // Try to unarchive an ARRAY of URLs first (multi-select case)
-                    if let urls = try? NSKeyedUnarchiver.unarchivedObject(ofClasses: [NSArray.self, NSURL.self], from: data) as? [URL] {
-                        continuation.resume(returning: urls)
-                        return
-                    }
-                    
-                    // Try to unarchive a single URL
-                    if let url = try? NSKeyedUnarchiver.unarchivedObject(ofClass: NSURL.self, from: data) as? URL {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                    
-                    // Fallback: try URL(dataRepresentation:)
-                    if let url = URL(dataRepresentation: data, relativeTo: nil) {
-                        continuation.resume(returning: [url])
-                        return
-                    }
-                }
-                
-                continuation.resume(throwing: NSError(domain: "InvalidData", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not decode URL from drag data"]))
-            }
-        }
     }
     
     func dropEntered(info: DropInfo) {

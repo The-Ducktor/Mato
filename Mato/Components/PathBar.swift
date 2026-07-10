@@ -6,18 +6,19 @@
 //
 
 import SwiftUI
+import os
 
 struct PathBar: View {
+    private let log = Logger(subsystem: "com.mato.app", category: "pathbar")
     @State private var isEditing = false
     @State private var pathString: String
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     @State var path: URL
     @FocusState private var isTextFieldFocused: Bool
     
-    init(path: URL? = nil, viewModel: DirectoryViewModel) {
-        let defaultURL = path ?? SettingsModel.shared.defaultFolderURL
-        self.path = defaultURL
-        self._pathString = State(initialValue: defaultURL.path)
+    init(path: URL, viewModel: DirectoryViewModel) {
+        self.path = path
+        self._pathString = State(initialValue: path.path)
         self.viewModel = viewModel
     }
     
@@ -266,7 +267,7 @@ struct PathBar: View {
         pasteboard.setString(path, forType: .string)
         
         // Optional: Show a brief confirmation (you could add a toast notification here)
-        print("Copied path to clipboard: \(path)")
+        log.debug("Copied path to clipboard: \(path, privacy: .public)")
     }
     
     private func showInFinder(_ path: String) {

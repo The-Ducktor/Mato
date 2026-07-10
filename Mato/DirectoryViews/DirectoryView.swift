@@ -6,16 +6,13 @@ import UniformTypeIdentifiers
 
 
 struct DirectoryView: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    @Bindable var viewModel: DirectoryViewModel
     var onActivate: (() -> Void)? = nil
 
     @State private var selectedItems: Set<DirectoryItem.ID> = []
-    @State private var quickLookURL: URL?
-    @State private var showQuickLook = false
     @State private var showingRenameAlert = false
     @State private var renameText = ""
     @State private var itemToRename: DirectoryItem?
-    @ObservedObject private var settings = SettingsModel.shared
 
     @State private var sortOrder: [KeyPathComparator<DirectoryItem>] =
         SettingsModel.keyPathComparator(
@@ -31,31 +28,42 @@ struct DirectoryView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            PathBar(
-                path: viewModel.currentDirectory
-                    ?? URL(fileURLWithPath: "/Users"),
-                viewModel: viewModel
-            )
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onActivate?()
+        return VStack(spacing: 0) {
+            if let currentDirectory = viewModel.currentDirectory {
+                PathBar(
+                    path: currentDirectory,
+                    viewModel: viewModel
+                )
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    onActivate?()
+                }
+            } else {
+                // Show empty path bar while loading
+                Rectangle()
+                    .fill(Color(NSColor.controlBackgroundColor))
+                    .frame(height: 34)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color(NSColor.separatorColor).opacity(0.3), lineWidth: 1)
+                    )
+                    .padding(.horizontal, 10)
             }
             
             // Error banner
             if let error = viewModel.errorMessage {
                 HStack {
                     Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundColor(.orange)
+                        .foregroundStyle(.orange)
                     Text(error)
                         .font(.caption)
-                        .foregroundColor(.primary)
+                        .foregroundStyle(.primary)
                     Spacer()
                     Button(action: {
                         viewModel.errorMessage = nil
                     }) {
                         Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(.secondary)
+                            .foregroundStyle(.secondary)
                     }
                     .buttonStyle(.plain)
                 }
@@ -67,7 +75,7 @@ struct DirectoryView: View {
 
             ZStack {
                 Group {
-                    if settings.viewMode == "grid" {
+                    if viewModel.viewMode == .grid {
                             DirectoryGridView(
                                 viewModel: viewModel,
                                 selectedItems: $selectedItems,
@@ -121,7 +129,6 @@ struct DirectoryView: View {
                         handleSpaceKeyPress()
                         return .handled
                     }
-                    .quickLookPreview($quickLookURL, in: selectedItemURLs)
 
                 if viewModel.isLoading {
                     LoadingView()
@@ -133,6 +140,7 @@ struct DirectoryView: View {
         }
         .frame(minHeight: 400)
         .focusable()
+        .popoverTip(QuickLookTip(), arrowEdge: .bottom)
         .alert("Rename", isPresented: $viewModel.showingRenameAlert) {
             TextField("Name", text: $viewModel.renameText)
             Button("Cancel", role: .cancel) {}
@@ -156,10 +164,14 @@ struct DirectoryView: View {
 
     // MARK: - Drag and Drop
 
+    /// O(1) lookup table built once per drag/selection access.
+    private var itemMap: [DirectoryItem.ID: DirectoryItem] {
+        viewModel.sortedItems.reduce(into: [:]) { $0[$1.id] = $1 }
+    }
+
     private func dragProvider() -> NSItemProvider {
-        let selectedURLs = selectedItems.compactMap { id in
-            viewModel.sortedItems.first { $0.id == id }?.url
-        }
+        let map = itemMap
+        let selectedURLs = selectedItems.compactMap { map[$0]?.url }
 
         guard !selectedURLs.isEmpty else { return NSItemProvider() }
 
@@ -188,35 +200,24 @@ struct DirectoryView: View {
     // Sorting is now handled by DirectoryViewModel
 
     private var selectedItemURLs: [URL] {
-        selectedItems.compactMap { id in
-            viewModel.sortedItems.first { $0.id == id }?.url
-        }
+        let map = itemMap
+        return selectedItems.compactMap { map[$0]?.url }
     }
 
     // MARK: - Key Press Actions
 
     private func handleSpaceKeyPress() {
-        guard let firstSelectedId = selectedItems.first,
-            let selectedItem = viewModel.sortedItems.first(where: {
-                $0.id == firstSelectedId
-            })
-        else {
-            return
-        }
-
-        openQuickLook(for: selectedItem.url)
+        guard !selectedItems.isEmpty else { return }
+        
+        let selectedURLs = selectedItemURLs
+        guard !selectedURLs.isEmpty else { return }
+        
+        // Use the shared Quick Look service
+        QuickLookService.shared.showPreview(for: selectedURLs, startingAt: 0)
     }
 
     private func openQuickLook(for url: URL) {
-        quickLookURL = url
-        showQuickLook = true
-    }
-}
-
-extension DirectoryViewModel {
-    func refreshCurrentDirectory() {
-        if let currentDir = currentDirectory {
-            loadDirectory(at: currentDir)
-        }
+        // Use the shared Quick Look service for single file preview
+        QuickLookService.shared.showPreview(for: [url], startingAt: 0)
     }
 }

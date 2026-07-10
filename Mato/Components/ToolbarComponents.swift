@@ -9,7 +9,7 @@ import SwiftUI
 
 // MARK: - Layout Menu
 struct LayoutMenu: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     
     var body: some View {
         Menu {
@@ -61,7 +61,7 @@ struct LayoutMenu: View {
 
 // MARK: - Pane Controls
 struct PaneControls: View {
-    @ObservedObject var paneManager: PaneManager
+    var paneManager: PaneManager
     
     var body: some View {
         Group {
@@ -87,45 +87,114 @@ struct PaneControls: View {
     }
 }
 
-// MARK: - Search Bar
-struct SearchBar: View {
-    @Binding var searchText: String
+// MARK: - View Mode Toggle (Per-Pane)
+struct ViewModeToggle: View {
+    var paneManager: PaneManager
     
     var body: some View {
-        HStack {
-            TextField("Search", text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .frame(minWidth: 200, maxWidth: 400)
-            
-            if !searchText.isEmpty {
-                Button {
-                    searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
+        Group {
+            if let activePane = paneManager.activePane {
+                Picker("View Mode", selection: Binding(
+                    get: { activePane.viewMode },
+                    set: { activePane.setViewMode($0) }
+                )) {
+                    Image(systemName: "list.bullet")
+                        .tag(ViewMode.list)
+                        .help("List View")
+                    Image(systemName: "square.grid.2x2")
+                        .tag(ViewMode.grid)
+                        .help("Grid View")
                 }
-                .buttonStyle(.plain)
+                .pickerStyle(.segmented)
+                .frame(width: 80)
+                .help("Change View Mode")
             }
         }
     }
 }
 
-// MARK: - View Mode Toggle
-struct ViewModeToggle: View {
-    @ObservedObject private var settings = SettingsModel.shared
+// MARK: - Sort Menu (Per-Pane)
+struct SortMenu: View {
+    var paneManager: PaneManager
     
     var body: some View {
-        Picker("View Mode", selection: $settings.viewMode) {
-            Image(systemName: "list.bullet")
-                .tag("list")
-                .help("List View")
-            Image(systemName: "square.grid.2x2")
-                .tag("grid")
-                .help("Grid View")
+        Group {
+            if let activePane = paneManager.activePane {
+                Menu {
+                    // Sort methods
+                    Section("Sort By") {
+                        ForEach(SettingsModel.shared.sortMethods, id: \.self) { method in
+                            Button {
+                                activePane.setSortMethod(method, ascending: activePane.sortAscending)
+                            } label: {
+                                HStack {
+                                    Text(sortMethodLabel(method))
+                                    if activePane.currentSortMethod == method {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // Sort direction
+                    Section("Order") {
+                        Button {
+                            activePane.setSortMethod(activePane.currentSortMethod, ascending: false)
+                        } label: {
+                            HStack {
+                                Text("Descending")
+                                if !activePane.sortAscending {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        Button {
+                            activePane.setSortMethod(activePane.currentSortMethod, ascending: true)
+                        } label: {
+                            HStack {
+                                Text("Ascending")
+                                if activePane.sortAscending {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Image(systemName: sortIcon(for: activePane.currentSortMethod, ascending: activePane.sortAscending))
+                }
+                .help("Sort Options")
+            }
         }
-        .pickerStyle(.segmented)
-        .frame(width: 80)
-        .help("Change View Mode")
+    }
+    
+    private func sortMethodLabel(_ method: String) -> String {
+        switch method {
+        case "name": return "Name"
+        case "date": return "Date Modified"
+        case "size": return "Size"
+        case "type": return "Kind"
+        case "created": return "Date Created"
+        default: return method.capitalized
+        }
+    }
+    
+    private func sortIcon(for method: String, ascending: Bool) -> String {
+        switch method {
+        case "name":
+            return ascending ? "textformat.characters.ascending" : "textformat.characters.descending"
+        case "date", "created":
+            return ascending ? "arrow.up.circle" : "arrow.down.circle"
+        case "size":
+            return ascending ? "arrow.up.arrow.down.circle" : "arrow.up.arrow.down"
+        case "type":
+            return ascending ? "doc.badge.arrow.up" : "doc"
+        default:
+            return ascending ? "arrow.up" : "arrow.down"
+        }
     }
 }
 

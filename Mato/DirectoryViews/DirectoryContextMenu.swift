@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct DirectoryContextMenuItems: View {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     let ids: Set<DirectoryItem.ID>
     let quickLookAction: ((URL) -> Void)?
     
@@ -115,20 +115,49 @@ struct DirectoryContextMenuItems: View {
             .foregroundColor(.red)
         }
 
-        // Services submenu (if needed)
+        // Services submenu
         if !ids.isEmpty {
             Divider()
-            Button("Services") {
-                // Services are typically handled by the system
-                viewModel.showServices(ids)
-            }
+            ServicesMenu(urls: viewModel.getURLs(from: ids))
         }
     }
 }
 
 
+private struct ServicesMenu: View {
+    let urls: [URL]
+    @State private var items: [NSMenuItem] = []
+
+    var body: some View {
+        Menu("Services") {
+            ForEach(items.indices, id: \.self) { i in
+                let item = items[i]
+                if item.hasSubmenu, let sub = item.submenu {
+                    Menu(item.title) {
+                        ForEach(sub.items.indices, id: \.self) { j in
+                            Button(sub.items[j].title) {
+                                _ = sub.items[j].target?.perform(sub.items[j].action, with: sub.items[j])
+                            }
+                        }
+                    }
+                } else {
+                    Button(item.title) {
+                        _ = item.target?.perform(item.action, with: item)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            let pb = NSPasteboard.general
+            pb.clearContents()
+            pb.writeObjects(urls as [NSPasteboardWriting])
+            items = NSApp.servicesMenu?.items ?? []
+        }
+    }
+}
+
 struct DirectoryContextMenu: ViewModifier {
-    @ObservedObject var viewModel: DirectoryViewModel
+    var viewModel: DirectoryViewModel
     let ids: Set<DirectoryItem.ID>
     let quickLookAction: (URL) -> Void
 

@@ -1,7 +1,9 @@
 import SwiftUI
+import os
 
 struct SettingsView: View {
-    @StateObject private var settings = SettingsModel.shared
+    private let log = Logger(subsystem: "com.mato.app", category: "settings")
+    @Bindable private var settings = SettingsModel.shared
     @State private var folderPath: String
     @State private var showingFolderPicker = false
     @State private var sliderValue: Double
@@ -20,18 +22,18 @@ struct SettingsView: View {
                     HStack {
                         Image(systemName: "gearshape.fill")
                             .font(.system(size: 20, weight: .medium))
-                            .foregroundColor(.accentColor)
+                            .foregroundStyle(Color.accentColor)
                         
                         Text("Preferences")
                             .font(.system(size: 24, weight: .medium))
-                            .foregroundColor(.primary)
+                            .foregroundStyle(.primary)
                         
                         Spacer()
                     }
                     
                     Text("Customize your workspace settings")
                         .font(.system(size: 13))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 24)
@@ -55,6 +57,32 @@ struct SettingsView: View {
                             .controlSize(.regular)
                         }
                     }
+                    
+                    // View Mode Preference Card
+                    SettingsCard(
+                        title: "View Mode Behavior",
+                        subtitle: "Choose how view mode is handled when navigating folders",
+                        icon: "square.grid.2x2"
+                    ) {
+                        VStack(alignment: .leading, spacing: 16) {
+                            Toggle(isOn: $settings.useSavedViewMode) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Remember view mode per folder")
+                                        .font(.system(size: 13, weight: .medium))
+                                        .foregroundStyle(.primary)
+                                    
+                                    Text(settings.useSavedViewMode ? 
+                                         "Each folder will remember its own view mode (grid/list)" : 
+                                         "All folders will use the current view mode")
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                            .toggleStyle(.switch)
+                            .controlSize(.regular)
+                        }
+                    }
                    
                     
                     // Folder Selection Card
@@ -68,20 +96,20 @@ struct SettingsView: View {
                                 HStack(spacing: 8) {
                                     Image(systemName: "folder.fill")
                                         .font(.system(size: 14))
-                                        .foregroundColor(.secondary)
+                                        .foregroundStyle(.secondary)
                                     
                                     if folderPath.isEmpty {
                                         Text("No folder selected")
-                                            .foregroundColor(.secondary)
+                                            .foregroundStyle(.secondary)
                                             .font(.system(size: 13))
                                     } else {
                                         Text(URL(fileURLWithPath: folderPath).lastPathComponent)
                                             .font(.system(size: 13, weight: .medium))
-                                            .foregroundColor(.primary)
+                                            .foregroundStyle(.primary)
                                         
                                         Text(folderPath)
                                             .font(.system(size: 11))
-                                            .foregroundColor(.secondary)
+                                            .foregroundStyle(.secondary)
                                             .lineLimit(1)
                                             .truncationMode(.middle)
                                     }
@@ -129,7 +157,7 @@ struct SettingsView: View {
                                     settings.defaultFolder = url.path
                                 }
                             case .failure(let error):
-                                print("Folder selection error: \(error.localizedDescription)")
+                                log.error("Folder selection error: \(error.localizedDescription, privacy: .public)")
                             }
                         }
                     }
@@ -145,7 +173,7 @@ struct SettingsView: View {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text("Number of Panels")
                                         .font(.system(size: 13, weight: .medium))
-                                        .foregroundColor(.primary)
+                                        .foregroundStyle(.primary)
                                     
                                     HStack(spacing: 12) {
                                         Slider(value: $sliderValue, in: 1...4, step: 1)
@@ -154,13 +182,13 @@ struct SettingsView: View {
                                         
                                         Text("\(Int(sliderValue))")
                                             .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                            .foregroundColor(.accentColor)
+                                            .foregroundStyle(Color.accentColor)
                                             .frame(width: 24, alignment: .center)
                                     }
                                     
                                     Text(panelDescription(for: Int(sliderValue)))
                                         .font(.system(size: 11))
-                                        .foregroundColor(.secondary)
+                                        .foregroundStyle(.secondary)
                                         .lineLimit(2)
                                         .frame(width: 180, height: 50, alignment: .leading) // set explict size for info text
                                 }
@@ -216,17 +244,17 @@ struct SettingsCard<Content: View>: View {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                     .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(.accentColor)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 20, height: 20)
                 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(.primary)
+                        .foregroundStyle(.primary)
                     
                     Text(subtitle)
                         .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                        .foregroundStyle(.secondary)
                 }
                 
                 Spacer()
